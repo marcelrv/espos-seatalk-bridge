@@ -31,4 +31,12 @@ function(st_add_host_test name)
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 
+add_library(st_codec STATIC ${ST_COMPONENTS}/st_codec/st_codec.c)
+target_include_directories(st_codec PUBLIC ${ST_COMPONENTS}/st_codec/include)
+if(NOT MSVC)
+  target_link_libraries(st_codec PUBLIC m)
+endif()
+
 st_add_host_test(test_st_link test_st_link.c)
+st_add_host_test(test_st_codec test_st_codec.c)
+target_link_libraries(test_st_codec PRIVATE st_codec)

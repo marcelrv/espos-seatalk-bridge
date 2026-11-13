@@ -19,6 +19,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "st_codec.h"
 #include "st_link.h"
 #include "st_phy.h"
 
@@ -78,6 +79,20 @@ static void print_datagram(const st_datagram_t *d, const char *tag)
     }
     if (tag[0]) {
         printf("%s", tag);
+    }
+    if (!tag[0]) { /* valid datagrams only: never decode flagged/incomplete ones */
+        st_decoded_t dec;
+        const st_dec_status_t ds = st_codec_decode(d->b, d->len, &dec);
+        if (ds == ST_DEC_OK) {
+            for (uint8_t i = 0; i < dec.n; i++) {
+                printf("-> %s %.4g ", st_quantity_name(dec.v[i].q), dec.v[i].value);
+            }
+            if (dec.flags) {
+                printf("(flags 0x%04X) ", U(dec.flags));
+            }
+        } else {
+            printf("-> %s ", ds == ST_DEC_UNKNOWN ? "unknown" : "bad length");
+        }
     }
     if (s_timing) {
         printf(" | idle-before %.2f ms  max-gap +%.2f ms", (double)d->idle_before_us / 1000.0,
