@@ -52,9 +52,10 @@ python tools/stconsole.py -k "d" -s 3        # per-datagram table (mode, rate, s
 python tools/stconsole.py -k "k" -s 8        # PHY self-test
 ```
 
-`h` lists all keys. ST50 notes (measured): heading is read from 89 only,
-and when data stops the ST50 keeps the last values for ~40 s before it
-shows dashes.
+`h` lists all keys. ST50 Multi notes (measured): heading is read from 89
+only; it has no COG page (53 is still sent for other devices); CMG/DMG
+are computed by the display, not sent by us; when data stops it keeps the
+last values for ~40 s before it shows dashes.
 
 ## Host tests
 
