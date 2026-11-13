@@ -26,6 +26,27 @@ The first configure generates a development signing key,
 `secure_boot_signing_key.pem` (git-ignored). A board flashed with it only
 accepts OTA images signed with the same key: back it up.
 
+## WiFi and OTA
+
+```powershell
+python tools/provision_wifi.py --port COMx     # WiFi from ../st50-emulator/secrets.ini into NVS (resets NVS)
+.\tools\ota.ps1 -Device espos-f768.local       # serve the build from this PC and install it over WiFi
+```
+
+The device pulls the image over HTTP from this PC (port 8070; allow Python
+through the Windows firewall on private networks). A new image that doesn't
+reach the network within 10 minutes rolls back to the previous one.
+
+On the CH340 DevKit the automatic reset into download mode is unreliable:
+hold BOOT, tap EN, release BOOT. Flash at 115200 baud; 460800 gave serial
+errors.
+
+## Host tests
+
+```powershell
+.\tools\host-test.ps1        # CMake + MSVC, runs ctest (build output in D:\Programming\esp\builds\host-test)
+```
+
 ## Back to the emulator
 
 Flash `../st50-emulator/firmware/st50-emulator-merged.bin` at 0x0, or
