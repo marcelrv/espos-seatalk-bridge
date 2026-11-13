@@ -1,7 +1,8 @@
 /*
  * seatalk-bridge: SeaTalk 1 <-> Signal K bridge on espOS.
  *
- * Bench-test application: PHY/link self-test, RX monitor, statistics.
+ * Bench-test application on st_core: self-test, RX monitor, simulated boat,
+ * statistics.
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -12,6 +13,8 @@
 #include "espos.h"
 #include "nvs.h"
 #include "st_bench.h"
+#include "st_con.h"
+#include "st_core.h"
 #include "st_phy.h"
 
 static const char *TAG = "seatalk-bridge";
@@ -67,10 +70,20 @@ void app_main(void)
 
     ESP_ERROR_CHECK(espos_start(NULL));
 
+    /* Telnet console right after espOS (it retries until WiFi is up) and before
+     * anything prints, so the output mutex exists for all tasks. */
+    st_con_start();
+
     /* nvs_flash_init() is done by espOS. */
     uint32_t boots = bump_boot_count();
-    printf("\nseatalk-bridge bench: reset reason %d (%s), boot #%u\n", (int)rr, reset_reason_name(rr),
-           (unsigned)boots);
+    st_con_printf("\nseatalk-bridge bench: reset reason %d (%s), boot #%u\n", (int)rr, reset_reason_name(rr),
+                  (unsigned)boots);
+
+    st_core_config_t cfg = ST_CORE_CONFIG_DEFAULT();
+    esp_err_t err = st_core_start(&cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "st_core_start failed: %s", esp_err_to_name(err));
+    }
 
     st_bench_start();
 }

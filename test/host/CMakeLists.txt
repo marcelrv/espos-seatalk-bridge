@@ -37,6 +37,16 @@ if(NOT MSVC)
   target_link_libraries(st_codec PUBLIC m)
 endif()
 
+add_library(st_sched STATIC ${ST_COMPONENTS}/st_sched/st_sched.c)
+target_include_directories(st_sched PUBLIC
+  ${ST_COMPONENTS}/st_sched/include
+  ${ST_COMPONENTS}/st_codec/include
+  ${ST_COMPONENTS}/st_phy/include)
+target_link_libraries(st_sched PUBLIC st_codec)
+
 st_add_host_test(test_st_link test_st_link.c)
 st_add_host_test(test_st_codec test_st_codec.c)
 target_link_libraries(test_st_codec PRIVATE st_codec)
+
+st_add_host_test(test_st_sched test_st_sched.c)
+target_link_libraries(test_st_sched PRIVATE st_sched)

@@ -29,8 +29,8 @@ static const st_dgram_info_t k_table[] = {
     {0x30, 3, "lamp", true, false, {ST_Q_LAMP_LEVEL, ST_Q_NONE}, 0},
     {0x52, 4, "sog", true, true, {ST_Q_SPEED_OVER_GROUND, ST_Q_NONE}, 1000},
     {0x53, 3, "cog", true, true, {ST_Q_COURSE_OVER_GROUND_MAGNETIC, ST_Q_NONE}, 1000},
-    {0x89, 5, "compass", true, true, {ST_Q_HEADING_MAGNETIC, ST_Q_NONE}, 0},
-    {0x9C, 4, "heading_rudder", true, true, {ST_Q_HEADING_MAGNETIC, ST_Q_RUDDER_ANGLE}, 1000},
+    {0x89, 5, "compass", true, true, {ST_Q_HEADING_MAGNETIC, ST_Q_NONE}, 1000}, /* ST50 reads heading from 89 (measured) */
+    {0x9C, 4, "heading_rudder", true, true, {ST_Q_HEADING_MAGNETIC, ST_Q_RUDDER_ANGLE}, 0}, /* autopilot style; ST50 ignores it */
 };
 
 #define TABLE_N (sizeof(k_table) / sizeof(k_table[0]))

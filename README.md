@@ -41,6 +41,21 @@ On the CH340 DevKit the automatic reset into download mode is unreliable:
 hold BOOT, tap EN, release BOOT. Flash at 115200 baud; 460800 gave serial
 errors.
 
+## Bench console
+
+Over WiFi (telnet, port 23, unauthenticated: bench use only) or USB serial:
+
+```powershell
+python tools/stconsole.py -k "t" -s 3        # statistics
+python tools/stconsole.py -k "v" -s 2        # simulated boat on/off (values to the ST50)
+python tools/stconsole.py -k "d" -s 3        # per-datagram table (mode, rate, sent, stale, native)
+python tools/stconsole.py -k "k" -s 8        # PHY self-test
+```
+
+`h` lists all keys. ST50 notes (measured): heading is read from 89 only,
+and when data stops the ST50 keeps the last values for ~40 s before it
+shows dashes.
+
 ## Host tests
 
 ```powershell
