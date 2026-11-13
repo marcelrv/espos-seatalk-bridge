@@ -1,0 +1,12 @@
+# SeaTalk 1 <-> Signal K bridge (espOS, ESP-IDF 6.0).
+# Design: ../SeaTalkCore_SPEC.md   Hardware: ../SeaTalkRemote_FIRMWARE.md
+#
+# espOS is the `espos/` git submodule. Its prologue sets the IDF version pin,
+# sdkconfig defaults, partition table, component dirs and the signing key.
+# The SeaTalk core (st_phy, st_link, st_sched, st_codec) lives in components/
+# and does not depend on espOS.
+cmake_minimum_required(VERSION 3.22)
+include("${CMAKE_CURRENT_LIST_DIR}/espos/cmake/espos_project.cmake")
+espos_project_prologue(NAME "seatalk-bridge")
+project(seatalk_bridge)
+espos_project_ui_partition()
