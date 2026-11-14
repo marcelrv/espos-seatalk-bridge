@@ -18,7 +18,7 @@ menu "SeaTalk bridge"
         help
             Compile the telnet mirror of the bench console. It is compiled in
             only; at run time it is started and stopped by the espOS config
-            setting bench.telnet (default off) and uses no RAM while off.
+            setting seatalk_console.telnet (default off) and uses no RAM while off.
             The console has no authentication: anyone on the LAN can send keys.
 
     config ST_BRIDGE_SIM

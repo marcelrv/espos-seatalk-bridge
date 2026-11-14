@@ -79,8 +79,8 @@ is chosen in `idf.py menuconfig` -> SeaTalk bridge:
 
 espOS has no run-time module loading, so optional parts are build-time
 choices. Telnet is the exception in one respect: when compiled in, it is
-switched on and off at run time in the espOS web UI (namespace `bench`, key
-`telnet`, default off). While off it costs no RAM (measured); while on it
+switched on and off at run time in the espOS web UI (tab "SeaTalk1 console",
+namespace `seatalk_console`, setting `telnet`, default off). While off it costs no RAM (measured); while on it
 takes about 5 KB plus about 8 KB per open session. Without `ST_BRIDGE_SIM`, keys `v`/`V`
 only report that the simulator is not in this build.
 

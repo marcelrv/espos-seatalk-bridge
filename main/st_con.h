@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 /* Call after espos_start(). With CONFIG_ST_BRIDGE_TELNET it watches the
- * config setting bench.telnet and starts/stops the telnet server on demand
+ * config setting seatalk_console.telnet and starts/stops the telnet server on demand
  * (nothing is allocated while it is off); without it st_con_printf only
  * writes to UART. */
 void st_con_start(void);

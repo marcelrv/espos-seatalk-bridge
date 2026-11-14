@@ -1,8 +1,8 @@
 {
-  "namespace": "bench",
+  "namespace": "seatalk_console",
   "version": 1,
-  "title": "Bench console",
-  "description": "Optional bench features of the SeaTalk bridge firmware.",
+  "title": "SeaTalk1 console",
+  "description": "Bench console of the SeaTalk1 bridge: the optional telnet mirror of the USB serial console.",
   "keys": [
     {"name": "telnet", "type": "bool", "default": false, "title": "Telnet console", "description": "Bench console on TCP port 23. Unauthenticated: anyone on the LAN can send keys, so use it on the bench only. Uses about 5 KB RAM while on, plus about 8 KB per open session; nothing while off. Only exists in builds with CONFIG_ST_BRIDGE_TELNET; other builds ignore it."}
   ]

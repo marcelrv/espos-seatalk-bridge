@@ -79,7 +79,7 @@ void app_main(void)
 
     /* Console output mux right after espOS and before anything prints, so the
      * output mutex exists for all tasks. The telnet server (if compiled in)
-     * starts on demand from the bench.telnet setting. */
+     * starts on demand from the seatalk_console.telnet setting. */
     st_con_start();
 
     /* nvs_flash_init() is done by espOS. */

@@ -8,7 +8,7 @@
  * SECURITY: the telnet console is unauthenticated and unencrypted. Anyone on
  * the LAN can send keys (start/stop the simulator, flood the bus). Bench use
  * only. It is compiled in only with CONFIG_ST_BRIDGE_TELNET and is switched
- * on at run time by the config setting bench.telnet (default off); build
+ * on at run time by the config setting seatalk_console.telnet (default off); build
  * without CONFIG_ST_BRIDGE_TELNET for anything else.
  *
  * On demand: while the setting is off nothing is allocated and no task or
@@ -64,7 +64,7 @@ static const char *TAG = "st_con";
 #define DEBOUNCE_US (500 * 1000)
 #define RECHECK_US (200 * 1000)
 #define RETRY_US (5 * 1000 * 1000)
-#define CFG_NS "bench"
+#define CFG_NS "seatalk_console"
 #define CFG_KEY "telnet"
 
 static SemaphoreHandle_t s_mtx; /* created once in st_con_start, never deleted */
@@ -394,8 +394,8 @@ void st_con_printf(const char *fmt, ...)
 void st_con_start(void)
 {
     bool on = false;
-    if (espos_config_get_bool("bench", "telnet", &on) == ESP_OK && on) {
-        ESP_LOGW(TAG, "bench.telnet is on but this firmware has no telnet console (CONFIG_ST_BRIDGE_TELNET)");
+    if (espos_config_get_bool("seatalk_console", "telnet", &on) == ESP_OK && on) {
+        ESP_LOGW(TAG, "seatalk_console.telnet is on but this firmware has no telnet console (CONFIG_ST_BRIDGE_TELNET)");
     }
 }
 
