@@ -4,22 +4,43 @@ SeaTalk 1 <-> Signal K bridge firmware for the SeaTalk ESP32 Remote board
 (classic ESP32). Built on [espOS](https://github.com/signalk-espOS/espOS)
 (ESP-IDF 6.0), included as the `espos/` submodule.
 
-- Design: [../SeaTalkCore_SPEC.md](../SeaTalkCore_SPEC.md)
-- Hardware: [../SeaTalkRemote_FIRMWARE.md](../SeaTalkRemote_FIRMWARE.md)
-- Bench reference: [../st50-emulator/](../st50-emulator/)
+The design notes live next to this folder in the seatalk-remote project:
+`SeaTalkCore_SPEC.md` (design), `SeaTalkRemote_FIRMWARE.md` (hardware) and
+`st50-emulator/` (bench reference).
+
+## Status
+
+Tested on the bench with an ST50 Multi display and a signalk-server:
+- PHY self-test and soak runs on a real bus;
+- Signal K → SeaTalk: depth, wind, speed, SOG, COG and heading shown on the
+  ST50 and matching the server;
+- the SOG/COG substitutes;
+- memory stable over time.
+
+Not yet proven on a boat over a longer period. SeaTalk → Signal K is
+implemented but untested, because the bench has no device that sends data
+(the ST50 only sends lamp datagrams). Treat it as experimental until it has
+sailed a while.
+
+The SeaTalk layers (`components/st_*`) don't depend on the board firmware
+and only `st_sk` depends on espOS. Once proven on the boat, they may move into
+espOS as a regular component (like `espos_nmea0183`), with only the board
+firmware staying here.
 
 ## Build (Windows, PowerShell)
 
-ESP-IDF v6.0.3 is installed in `D:\Programming\esp` (tools in
-`D:\Programming\esp\.espressif`). Build output goes outside the synced
-source tree.
+Needs ESP-IDF v6.0.x (espOS's pin is in `espos/.idf-version`). Load it with
+your IDF's `export.ps1`, or with `tools/idf-env.ps1` after setting
+`$env:ST_IDF_PATH` (the IDF folder) and `$env:ST_IDF_TOOLS_PATH` (its tools
+folder). `-B <build-dir>` is optional; a build directory outside a synced
+source tree avoids sync conflicts.
 
 ```powershell
 git submodule update --init
 . .\tools\idf-env.ps1
-idf.py -B D:\Programming\esp\builds\seatalk-bridge set-target esp32   # once
-idf.py -B D:\Programming\esp\builds\seatalk-bridge build
-idf.py -B D:\Programming\esp\builds\seatalk-bridge -p COMx flash monitor
+idf.py -B <build-dir> set-target esp32   # once
+idf.py -B <build-dir> build
+idf.py -B <build-dir> -p COMx flash monitor
 ```
 
 The first configure generates a development signing key,
@@ -29,9 +50,13 @@ accepts OTA images signed with the same key: back it up.
 ## WiFi and OTA
 
 ```powershell
-python tools/provision_wifi.py --port COMx     # WiFi from ../st50-emulator/secrets.ini into NVS (resets NVS)
-.\tools\ota.ps1 -Device espos-f768.local       # serve the build from this PC and install it over WiFi
+python tools/provision_wifi.py --port COMx --secrets <secrets.ini>   # WiFi into NVS (resets NVS)
+.\tools\ota.ps1 -Device <hostname>.local                            # serve the build from this PC and install it over WiFi
 ```
+
+`secrets.ini` has a `[secrets]` section with `wifi_ssid` and `wifi_password`
+(default: the st50-emulator's, next to this folder). The device's hostname is
+`espos-` plus the last four hex digits of its MAC.
 
 The device pulls the image over HTTP from this PC (port 8070; allow Python
 through the Windows firewall on private networks). A new image that doesn't
@@ -43,13 +68,14 @@ errors.
 
 ## Bench console
 
-Over WiFi (telnet, port 23, unauthenticated: bench use only) or USB serial:
+Over WiFi (telnet, port 23, unauthenticated: bench use only) or USB serial.
+`stconsole.py` connects to `--host <hostname>.local`:
 
 ```powershell
-python tools/stconsole.py -k "t" -s 3        # statistics
-python tools/stconsole.py -k "v" -s 2        # simulated boat on/off (values to the ST50)
-python tools/stconsole.py -k "d" -s 3        # per-datagram table (mode, rate, sent, stale, native)
-python tools/stconsole.py -k "k" -s 8        # PHY self-test
+python tools/stconsole.py --host <hostname>.local -k "t" -s 3   # statistics
+python tools/stconsole.py --host <hostname>.local -k "v" -s 2   # simulated boat on/off (values to the ST50)
+python tools/stconsole.py --host <hostname>.local -k "d" -s 3   # per-datagram table (mode, rate, sent, stale, native)
+python tools/stconsole.py --host <hostname>.local -k "k" -s 8   # PHY self-test
 ```
 
 `h` lists all keys. ST50 Multi notes (measured): heading is read from 89
@@ -88,19 +114,19 @@ marked `ignore = dirty`, so the patched files don't show in `git status`.
 
 - `espos-0001-schema-from-flash.patch`: the config page failed with
   `ESP_ERR_NO_MEM` because the 33 KB schema was copied into RAM. Upstream:
-  signalk-espOS/espOS#309; drop the patch once that is merged and the
-  submodule is updated.
+  [signalk-espOS/espOS#309](https://github.com/signalk-espOS/espOS/pull/309);
+  drop the patch once that is merged and the submodule is updated.
 
 ## Host tests
 
 ```powershell
-.\tools\host-test.ps1        # CMake + MSVC, runs ctest (build output in D:\Programming\esp\builds\host-test)
+.\tools\host-test.ps1        # CMake + MSVC Build Tools 2022, runs ctest (build directory set in the script)
 ```
 
 ## Back to the emulator
 
-Flash `../st50-emulator/firmware/st50-emulator-merged.bin` at 0x0, or
-`pio run -t upload` in `../st50-emulator`.
+Flash `st50-emulator/firmware/st50-emulator-merged.bin` (next to this
+folder) at 0x0, or run `pio run -t upload` in `st50-emulator/`.
 
 ## License
 
