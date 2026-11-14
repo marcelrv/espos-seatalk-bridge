@@ -57,6 +57,24 @@ only; it has no COG page (53 is still sent for other devices); CMG/DMG
 are computed by the display, not sent by us; when data stops it keeps the
 last values for ~40 s before it shows dashes.
 
+## Signal K
+
+The device publishes and subscribes through espOS (approve it once in
+signalk-server under Security → Access Requests). Settings are in the espOS
+web UI, namespace `seatalk`: per datagram type a mode (`off`, `to_sk`,
+`to_bus`, `both`, `auto`) and transmit period, per value an optional
+Signal K `$source` filter, plus idle wait, jitter and stale timeout.
+
+- Values this device publishes appear as `$source` `<hostname>.XX`; the
+  adapter ignores those on the way back (no SeaTalk → Signal K → SeaTalk loop).
+- Without `headingMagnetic` / `courseOverGroundMagnetic` on the server, the
+  magnetic value is computed from the true one minus `magneticVariation`.
+- Diagnostics: `espos.<hostname>.seatalk.*` every 10 s.
+
+Memory (classic ESP32, no PSRAM): about 42 KB free at rest, ~8 KB less
+while a telnet session is open. `sdkconfig.defaults` trims espOS's Signal K
+batch table to 16 slots for this.
+
 ## Host tests
 
 ```powershell

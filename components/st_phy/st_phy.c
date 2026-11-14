@@ -31,7 +31,12 @@ static const char *TAG = "st_phy";
 
 #define BAUD 4800
 #define CHAR_US (11u * 1000000u / BAUD) /* 2291 us */
-#define RING 1024u                      /* power of two */
+/* RX ring, power of two. 256 characters = 0.59 s of a completely full bus.
+ * st_core drains it at least every ST_CORE_WAIT_SLICE_MS (50 ms) plus one
+ * datagram send (<= 41 ms), so the worst case is ~40 characters. Was 1024
+ * in the emulator; shrunk to save 6 KB of internal RAM (ring_overflow
+ * counts it should that assumption ever fail). */
+#define RING 256u
 #define RX_ERR_MASK (UART_INTR_PARITY_ERR | UART_INTR_FRAM_ERR)
 
 static uart_dev_t *s_hw;

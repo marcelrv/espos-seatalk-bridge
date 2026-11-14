@@ -50,3 +50,12 @@ target_link_libraries(test_st_codec PRIVATE st_codec)
 
 st_add_host_test(test_st_sched test_st_sched.c)
 target_link_libraries(test_st_sched PRIVATE st_sched)
+
+add_library(st_sk_map STATIC ${ST_COMPONENTS}/st_sk/st_sk_map.c)
+target_include_directories(st_sk_map PUBLIC ${ST_COMPONENTS}/st_sk)
+target_link_libraries(st_sk_map PUBLIC st_codec)
+
+st_add_host_test(test_st_sk_map test_st_sk_map.c)
+target_link_libraries(test_st_sk_map PRIVATE st_sk_map)
+target_compile_definitions(test_st_sk_map PRIVATE
+  ST_SK_DESCRIPTOR="${ST_COMPONENTS}/st_sk/config/seatalk.json")

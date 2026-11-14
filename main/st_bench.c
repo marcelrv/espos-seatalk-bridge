@@ -27,6 +27,7 @@
 #include "st_core.h"
 #include "st_link.h"
 #include "st_sched.h"
+#include "st_sk.h"
 #include "st_sim.h"
 
 static const char *TAG = "st_bench";
@@ -71,7 +72,7 @@ void st_bench_print_help(void)
            "       v simulated boat on/off | V boat STATIC/SWEEP | p pause/resume periodic sending\n"
            "       1..5 all datagrams: off/to_sk/to_bus/both/auto | d datagram table\n"
            "       i idle-before diagnostics | w idle wait 30/26/40 ms | 8 heading via 89 <-> 9C\n"
-           "       t stats | z reset stats | r RX monitor on/off\n"
+           "       t stats | z reset stats | r RX monitor on/off | s Signal K stats\n"
            "       x timing per datagram on/off | a auto stats (10 s) on/off\n");
 }
 
@@ -296,6 +297,16 @@ static void toggle(volatile bool *flag, const char *name)
     st_con_printf("%s %s\n", name, *flag ? "ON" : "OFF");
 }
 
+static void print_sk_stats(void)
+{
+    st_sk_stats_t k;
+    st_sk_get_stats(&k);
+    st_con_printf("Signal K: own source %s | published %u, received %u, own-ignored %u, filtered %u, "
+                  "mag derived %u, bad value %u\n",
+                  st_sk_own_label(), U(k.published), U(k.received), U(k.own_ignored), U(k.filtered),
+                  U(k.mag_derived), U(k.bad_value));
+}
+
 static void handle_cmd(char c)
 {
     switch (c) {
@@ -358,6 +369,7 @@ static void handle_cmd(char c)
                (double)IDLE_JITTER_US / 1000.0);
         break;
     case 't': print_stats(); break;
+    case 's': print_sk_stats(); break;
     case 'z': reset_stats(); break;
     case 'r': toggle(&s_rx_monitor, "RX monitor"); break;
     case 'x': toggle(&s_timing, "Datagram timing"); break;
@@ -448,7 +460,7 @@ void st_bench_start(void)
         ESP_LOGE(TAG, "queue create failed");
         return;
     }
-    st_core_on_rx(on_rx, NULL);
+    st_core_add_rx(on_rx, NULL);
     st_sim_start();
     if (xTaskCreate(bench_task, "bench", 4096, NULL, 4, NULL) != pdPASS) {
         ESP_LOGE(TAG, "bench task create failed");

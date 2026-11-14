@@ -37,8 +37,11 @@ static esp_err_t s_start_err;
 /* guarded by s_lock */
 static st_sched_t s_sched;
 static st_core_stats_t s_st;
-static st_rx_cb_t s_rx_cb;
-static void *s_rx_arg;
+static struct {
+    st_rx_cb_t cb;
+    void *arg;
+} s_rx[ST_CORE_MAX_RX_CB];
+static volatile uint8_t s_n_rx;
 static uint32_t s_idle_n[256], s_idle_min[256], s_idle_max[256];
 static uint32_t s_idle_us, s_jitter_us;
 static volatile bool s_paused;
@@ -102,13 +105,14 @@ static void process_rx(void)
             }
             s_idle_n[cmd]++;
         }
-        const st_rx_cb_t cb = s_rx_cb;
-        void *const arg = s_rx_arg;
+        const uint8_t n_cb = s_n_rx;
         UNLOCK();
 
-        /* Outside the lock: the callback may call st_core_set_value(). */
-        if (cb) {
-            cb(ev, &dg, ds, ev == ST_LINK_DATAGRAM ? &dec : NULL, forward, arg);
+        /* Outside the lock: a callback may call st_core_set_value(). The
+         * table only grows and entries never change once set, so reading
+         * the first n_cb entries without the lock is safe. */
+        for (uint8_t i = 0; i < n_cb; i++) {
+            s_rx[i].cb(ev, &dg, ds, ev == ST_LINK_DATAGRAM ? &dec : NULL, forward, s_rx[i].arg);
         }
     }
 }
@@ -172,8 +176,22 @@ static send_result_t send_polite(const uint8_t *b, uint8_t len, uint8_t retries)
     if (retries) {
         quiet += rand_range(ST_CORE_BACKOFF_MIN_US, ST_CORE_BACKOFF_MAX_US);
     }
+    /* Wait in short slices and drain RX in between: foreign datagrams are
+     * handled promptly, and the PHY's RX ring never has to hold more than
+     * one slice of a busy bus (it is sized for that, see st_phy.c). */
     const int64_t t0 = esp_timer_get_time();
-    const bool quiet_ok = st_phy_wait_quiet(quiet, ST_CORE_QUIET_TIMEOUT_MS);
+    const int64_t deadline = t0 + (int64_t)ST_CORE_QUIET_TIMEOUT_MS * 1000;
+    bool quiet_ok = false;
+    for (;;) {
+        if (st_phy_wait_quiet(quiet, ST_CORE_WAIT_SLICE_MS)) {
+            quiet_ok = true;
+            break;
+        }
+        process_rx();
+        if (esp_timer_get_time() >= deadline) {
+            break;
+        }
+    }
     const uint32_t waited = (uint32_t)(esp_timer_get_time() - t0);
 
     LOCK();
@@ -420,12 +438,26 @@ esp_err_t st_core_start(const st_core_config_t *cfg)
     return s_start_err;
 }
 
-void st_core_on_rx(st_rx_cb_t cb, void *arg)
+esp_err_t st_core_add_rx(st_rx_cb_t cb, void *arg)
 {
+    if (!cb) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_lock) {
+        return ESP_ERR_INVALID_STATE; /* call after st_core_start() */
+    }
+    esp_err_t err = ESP_OK;
     LOCK();
-    s_rx_cb = cb;
-    s_rx_arg = arg;
+    if (s_n_rx >= ST_CORE_MAX_RX_CB) {
+        err = ESP_ERR_NO_MEM;
+    } else {
+        s_rx[s_n_rx].cb = cb;
+        s_rx[s_n_rx].arg = arg;
+        __asm__ __volatile__("memw"); /* entry visible before the count */
+        s_n_rx = s_n_rx + 1;
+    }
     UNLOCK();
+    return err;
 }
 
 esp_err_t st_core_set_value(st_quantity_t q, double value)

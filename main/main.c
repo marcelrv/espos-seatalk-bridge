@@ -16,6 +16,7 @@
 #include "st_con.h"
 #include "st_core.h"
 #include "st_phy.h"
+#include "st_sk.h"
 
 static const char *TAG = "seatalk-bridge";
 
@@ -83,6 +84,11 @@ void app_main(void)
     esp_err_t err = st_core_start(&cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "st_core_start failed: %s", esp_err_to_name(err));
+    } else {
+        err = st_sk_start();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "st_sk_start failed: %s", esp_err_to_name(err));
+        }
     }
 
     st_bench_start();

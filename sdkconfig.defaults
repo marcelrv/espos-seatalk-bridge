@@ -1,0 +1,8 @@
+# Project overrides on top of espOS's defaults (espos/sdkconfig.d/).
+# Note: values here only apply to a fresh sdkconfig; the same change is
+# made in the local sdkconfig when it already exists.
+
+# Signal K delta batch table: each slot ~370 B of permanent internal RAM.
+# 16 is plenty (bus values + 20 diagnostics per 10 s; a full batch just
+# closes early) and saves ~6 KB on the classic ESP32 (no PSRAM).
+CONFIG_ESPOS_SK_PENDING_MAX=16

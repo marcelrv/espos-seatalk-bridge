@@ -31,6 +31,7 @@ extern "C" {
 #define ST_CORE_BACKOFF_MIN_US 2000   /* rule 2 */
 #define ST_CORE_BACKOFF_MAX_US 15000
 #define ST_CORE_QUIET_TIMEOUT_MS 2000 /* no quiet gap this long: bus-busy */
+#define ST_CORE_WAIT_SLICE_MS 50      /* RX is drained at least this often while waiting */
 #define ST_CORE_ONCE_QUEUE 8
 
 typedef struct {
@@ -60,7 +61,10 @@ esp_err_t st_core_start(const st_core_config_t *cfg);
  * Keep it short: it runs on the bus task. */
 typedef void (*st_rx_cb_t)(st_link_event_t ev, const st_datagram_t *dg, st_dec_status_t ds,
                            const st_decoded_t *dec, bool forward, void *arg);
-void st_core_on_rx(st_rx_cb_t cb, void *arg);
+#define ST_CORE_MAX_RX_CB 4
+/* Add a listener (bench monitor, Signal K adapter, $STALK ...), called in
+ * registration order. ESP_ERR_NO_MEM when ST_CORE_MAX_RX_CB are registered. */
+esp_err_t st_core_add_rx(st_rx_cb_t cb, void *arg);
 
 /* Value for the bus direction, timestamped now. NaN clears it. */
 esp_err_t st_core_set_value(st_quantity_t q, double value);
