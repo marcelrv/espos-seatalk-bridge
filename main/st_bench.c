@@ -8,8 +8,9 @@
  * only uses the st_core API:
  *  - the RX callback runs on st_task: it prints (when the monitor is on) and
  *    bumps s_lamp, nothing else;
- *  - the UART0 console task only calls st_bench_key(), which enqueues the key;
- *  - the bench task takes the keys and does the heavy work (self-tests, stats).
+ *  - one bench task reads UART0 and the key queue (fed by st_bench_key(), e.g.
+ *    from the telnet console), runs the commands (self-tests, stats) and the
+ *    periodic work.
  */
 #include "st_bench.h"
 
@@ -22,6 +23,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -31,7 +33,9 @@
 #include "st_link.h"
 #include "st_sched.h"
 #include "st_sk.h"
+#if CONFIG_ST_BRIDGE_SIM
 #include "st_sim.h"
+#endif
 
 static const char *TAG = "st_bench";
 
@@ -49,7 +53,7 @@ static volatile bool s_timing = false;
 static volatile uint32_t s_lamp; /* 0x30 datagrams; counted on st_task */
 
 /* Bench-task state. */
-static bool s_auto_stats = true;
+static bool s_auto_stats = false;
 static bool s_continuous = false;
 
 /* Idle wait presets (key w). */
@@ -72,7 +76,10 @@ void st_bench_print_help(void)
 {
     st_con_printf("\n"
            "Keys:  h help | k self-test once | K continuous self-test on/off\n"
-           "       v simulated boat on/off | V boat STATIC/SWEEP | p pause/resume periodic sending\n"
+#if CONFIG_ST_BRIDGE_SIM
+           "       v simulated boat on/off | V boat STATIC/SWEEP\n"
+#endif
+           "       p pause/resume periodic sending\n"
            "       1..5 all datagrams: off/to_sk/to_bus/both/auto | d datagram table\n"
            "       i idle-before diagnostics | w idle wait 30/26/40 ms | 8 heading via 89 <-> 9C\n"
            "       t stats | z reset stats | r RX monitor on/off | s Signal K stats\n"
@@ -148,9 +155,13 @@ static void print_stats(void)
            "native-pause %u | idle-wait max %.1f ms\n",
            U(s.tx_ok), U(s.tx_retried_ok), U(s.tx_collisions), U(s.tx_no_echo), U(s.tx_bus_busy), U(s.tx_dropped),
            U(s.stale_skips), U(s.native_pauses), (double)s.idle_wait_max_us / 1000.0);
-    st_con_printf("     state: paused %s  bus-held-low %s  no-echo-pause %s | sim %s %s | idle %.1f ms | up %u s\n",
+    st_con_printf("     state: paused %s  bus-held-low %s  no-echo-pause %s | sim %s | idle %.1f ms | up %u s\n",
            s.paused ? "yes" : "no", s.bus_held_low ? "yes" : "no", s.no_echo_pause ? "yes" : "no",
-           st_sim_enabled() ? "on" : "off", st_sim_sweep() ? "SWEEP" : "STATIC",
+#if CONFIG_ST_BRIDGE_SIM
+           st_sim_enabled() ? (st_sim_sweep() ? "on SWEEP" : "on STATIC") : "off",
+#else
+           "n/a",
+#endif
            (double)IDLE_PRESETS_US[s_idle_idx] / 1000.0, U(now / 1000000));
     st_con_printf("PHY  rx bytes %u  echo ok %u bad %u  ambiguous %u  frame-err %u  overflow hw %u ring %u  "
            "max-bytes/ISR %u\n",
@@ -331,6 +342,7 @@ static void handle_cmd(char c)
             st_con_printf("Continuous self-test started\n");
         }
         break;
+#if CONFIG_ST_BRIDGE_SIM
     case 'v':
         st_sim_enable(!st_sim_enabled());
         st_con_printf("Simulated boat %s (%s)\n", st_sim_enabled() ? "ON" : "OFF (values go stale after 5 s)",
@@ -340,6 +352,10 @@ static void handle_cmd(char c)
         st_sim_set_sweep(!st_sim_sweep());
         st_con_printf("Simulated boat mode: %s\n", st_sim_sweep() ? "SWEEP" : "STATIC");
         break;
+#else
+    case 'v':
+    case 'V': st_con_printf("Simulated boat not in this build (CONFIG_ST_BRIDGE_SIM)\n"); break;
+#endif
     case 'p':
         st_core_pause(!st_core_paused());
         st_con_printf("Periodic sending %s\n", st_core_paused() ? "PAUSED" : "RESUMED");
@@ -385,20 +401,61 @@ static void handle_cmd(char c)
     }
 }
 
-/* ---- tasks ---- */
+/* ---- task ---- */
 
+void st_bench_key(char c)
+{
+    if (c == '\r' || c == '\n' || s_cmd_q == NULL) {
+        return;
+    }
+    if (xQueueSend(s_cmd_q, &c, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "command queue full, key '%c' dropped", c);
+    }
+}
+
+/*
+ * The one bench task. Keys come from UART0 (USB serial) and from the queue
+ * (telnet, via st_bench_key()). A UART driver is installed only for RX
+ * (uart_read_bytes). uart_vfs_dev_use_driver() is NOT called: stdout/printf and
+ * ESP_LOG keep using the polling console TX path set up at boot, so logging is
+ * unaffected, and we avoid stdin going through the driver.
+ *
+ * Stack 4096: the deepest path is print_stats()/print_table() (a stats struct
+ * or slot plus printf with float conversion, ~1.5 KB deep); the 256-char
+ * lines are built elsewhere (RX callback on st_task, st_con's heap buffers).
+ */
 static void bench_task(void *arg)
 {
     (void)arg;
+    bool uart_ok = true;
+    if (!uart_is_driver_installed(UART_NUM_0)) {
+        const esp_err_t err = uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "uart_driver_install(UART0) failed: %s; USB serial keys disabled", esp_err_to_name(err));
+            uart_ok = false;
+        }
+    }
+    st_bench_print_help();
+
     s_load_t_us = esp_timer_get_time();
     int64_t last_auto = esp_timer_get_time() / 1000;
     int64_t last_cont = last_auto;
 
     for (;;) {
-        char c;
-        if (xQueueReceive(s_cmd_q, &c, s_continuous ? 0 : pdMS_TO_TICKS(100)) == pdTRUE) {
-            handle_cmd(c);
-            continue; /* drain all pending keys first */
+        /* Wait for a UART key (100 ms), or poll when the continuous self-test
+         * keeps the task busy. */
+        uint8_t c;
+        if (uart_ok) {
+            if (uart_read_bytes(UART_NUM_0, &c, 1, s_continuous ? 0 : pdMS_TO_TICKS(100)) == 1 && c != '\r' &&
+                c != '\n') {
+                handle_cmd((char)c);
+            }
+        } else {
+            vTaskDelay(s_continuous ? 1 : pdMS_TO_TICKS(100));
+        }
+        char k;
+        while (xQueueReceive(s_cmd_q, &k, 0) == pdTRUE) {
+            handle_cmd(k); /* telnet keys */
         }
 
         if (s_continuous && !cont_round()) {
@@ -420,42 +477,6 @@ static void bench_task(void *arg)
     }
 }
 
-void st_bench_key(char c)
-{
-    if (c == '\r' || c == '\n' || s_cmd_q == NULL) {
-        return;
-    }
-    if (xQueueSend(s_cmd_q, &c, 0) != pdTRUE) {
-        ESP_LOGW(TAG, "command queue full, key '%c' dropped", c);
-    }
-}
-
-/*
- * Console on UART0 (USB serial). A UART driver is installed only for RX
- * (uart_read_bytes). uart_vfs_dev_use_driver() is NOT called: stdout/printf and
- * ESP_LOG keep using the polling console TX path set up at boot, so logging is
- * unaffected, and we avoid stdin going through the driver.
- */
-static void console_task(void *arg)
-{
-    (void)arg;
-    if (!uart_is_driver_installed(UART_NUM_0)) {
-        esp_err_t err = uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "uart_driver_install(UART0) failed: %s; console disabled", esp_err_to_name(err));
-            vTaskDelete(NULL);
-            return;
-        }
-    }
-    st_bench_print_help();
-    for (;;) {
-        uint8_t c;
-        if (uart_read_bytes(UART_NUM_0, &c, 1, pdMS_TO_TICKS(100)) == 1) {
-            st_bench_key((char)c);
-        }
-    }
-}
-
 void st_bench_start(void)
 {
     s_cmd_q = xQueueCreate(16, sizeof(char));
@@ -464,11 +485,10 @@ void st_bench_start(void)
         return;
     }
     st_core_add_rx(on_rx, NULL);
+#if CONFIG_ST_BRIDGE_SIM
     st_sim_start();
+#endif
     if (xTaskCreate(bench_task, "bench", 4096, NULL, 4, NULL) != pdPASS) {
         ESP_LOGE(TAG, "bench task create failed");
-    }
-    if (xTaskCreate(console_task, "console", 3072, NULL, 3, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "console task create failed");
     }
 }

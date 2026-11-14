@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+
+menu "SeaTalk bridge"
+
+    config ST_BRIDGE_BENCH
+        bool "Bench console on USB serial (key commands, statistics)"
+        default y
+        help
+            Compile the bench console: single-key commands on the USB serial
+            port (self-test, RX monitor, datagram table, statistics). Costs one
+            4 KB task. Without it the board runs only the bridge itself.
+
+    config ST_BRIDGE_TELNET
+        bool "Telnet console (port 23, unauthenticated: bench use only)"
+        default n
+        depends on ST_BRIDGE_BENCH
+        help
+            Compile the telnet mirror of the bench console. It is compiled in
+            only; at run time it is started and stopped by the espOS config
+            setting bench.telnet (default off) and uses no RAM while off.
+            The console has no authentication: anyone on the LAN can send keys.
+
+    config ST_BRIDGE_SIM
+        bool "Simulated boat (demo values to the bus, keys v/V)"
+        default n
+        depends on ST_BRIDGE_BENCH
+        help
+            Compile the simulated boat, which feeds demo values to the bus
+            (keys v and V in the bench console).
+
+endmenu

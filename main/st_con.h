@@ -3,24 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Console output/input multiplexer for the bench app: printf-style output goes
- * to UART0 and, when connected, to a telnet client (TCP port 23); bytes from
- * the telnet client are fed to st_bench_key().
+ * to UART0 and, when the telnet console is on and a client is connected, to
+ * that client (TCP port 23); bytes from the client are fed to st_bench_key().
  */
 #pragma once
 
 #include <stdint.h>
 
-/* Compile-time switch: 0 removes the network console (st_con_printf then only
- * writes to UART). Set to 0 for production builds, see the security note in
- * st_con.c. */
-#define ST_CON_ENABLE 1
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Start the telnet server task. Call after espos_start(); safe before the
- * network is up (keeps retrying). */
+/* Call after espos_start(). With CONFIG_ST_BRIDGE_TELNET it watches the
+ * config setting bench.telnet and starts/stops the telnet server on demand
+ * (nothing is allocated while it is off); without it st_con_printf only
+ * writes to UART. */
 void st_con_start(void);
 
 /* printf to UART and to the telnet client. Lines up to ~512 bytes (longer ones

@@ -15,7 +15,10 @@
 #include "esp_system.h"
 #include "espos.h"
 #include "nvs.h"
+#include "sdkconfig.h"
+#if CONFIG_ST_BRIDGE_BENCH
 #include "st_bench.h"
+#endif
 #include "st_con.h"
 #include "st_core.h"
 #include "st_phy.h"
@@ -74,8 +77,9 @@ void app_main(void)
 
     ESP_ERROR_CHECK(espos_start(NULL));
 
-    /* Telnet console right after espOS (it retries until WiFi is up) and before
-     * anything prints, so the output mutex exists for all tasks. */
+    /* Console output mux right after espOS and before anything prints, so the
+     * output mutex exists for all tasks. The telnet server (if compiled in)
+     * starts on demand from the bench.telnet setting. */
     st_con_start();
 
     /* nvs_flash_init() is done by espOS. */
@@ -94,5 +98,7 @@ void app_main(void)
         }
     }
 
+#if CONFIG_ST_BRIDGE_BENCH
     st_bench_start();
+#endif
 }

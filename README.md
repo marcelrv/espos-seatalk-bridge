@@ -68,12 +68,27 @@ errors.
 
 ## Bench console
 
-Over WiFi (telnet, port 23, unauthenticated: bench use only) or USB serial.
-`stconsole.py` connects to `--host <hostname>.local`:
+Key commands over USB serial and, optionally, WiFi (telnet). What is built in
+is chosen in `idf.py menuconfig` -> SeaTalk bridge:
+
+| Option | Default | What |
+|---|---|---|
+| `ST_BRIDGE_BENCH` | on | Bench console on USB serial (key commands, statistics) |
+| `ST_BRIDGE_TELNET` | off | Telnet console, port 23, unauthenticated: bench use only |
+| `ST_BRIDGE_SIM` | off | Simulated boat (demo values to the bus, keys `v`/`V`) |
+
+espOS has no run-time module loading, so optional parts are build-time
+choices. Telnet is the exception in one respect: when compiled in, it is
+switched on and off at run time in the espOS web UI (namespace `bench`, key
+`telnet`, default off). While off it costs no RAM (measured); while on it
+takes about 5 KB plus about 8 KB per open session. Without `ST_BRIDGE_SIM`, keys `v`/`V`
+only report that the simulator is not in this build.
+
+With telnet on, `stconsole.py` connects to `--host <hostname>.local`:
 
 ```powershell
 python tools/stconsole.py --host <hostname>.local -k "t" -s 3   # statistics
-python tools/stconsole.py --host <hostname>.local -k "v" -s 2   # simulated boat on/off (values to the ST50)
+python tools/stconsole.py --host <hostname>.local -k "v" -s 2   # simulated boat on/off (needs ST_BRIDGE_SIM)
 python tools/stconsole.py --host <hostname>.local -k "d" -s 3   # per-datagram table (mode, rate, sent, stale, native)
 python tools/stconsole.py --host <hostname>.local -k "k" -s 8   # PHY self-test
 ```
@@ -101,9 +116,9 @@ Signal K `$source` filter, plus idle wait, jitter and stale timeout.
   without SOG/COG pages such as the ST50 Multi. `fallback` uses them only
   while the real value is stale, `replace` always.
 
-Memory (classic ESP32, no PSRAM): about 42 KB free at rest, ~8 KB less
-while a telnet session is open. `sdkconfig.defaults` trims espOS's Signal K
-batch table to 16 slots for this.
+Memory (classic ESP32, no PSRAM): about 52 KB free at rest in the default
+build (bench console on, telnet and simulator off). `sdkconfig.defaults`
+trims espOS's Signal K batch table to 16 slots to help.
 
 ## espOS patches
 
