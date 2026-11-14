@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * seatalk-bridge: SeaTalk 1 <-> Signal K bridge on espOS.
  *
  * Bench-test application on st_core: self-test, RX monitor, simulated boat,

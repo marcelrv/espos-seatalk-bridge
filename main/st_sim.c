@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Simulated boat, after the st50-emulator's Boat struct and sweep formulas.
  * All values are handed to st_core in SI units.
  */

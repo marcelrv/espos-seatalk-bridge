@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "st_sk_map.h"
 
 #include <ctype.h>

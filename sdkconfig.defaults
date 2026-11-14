@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 # Project overrides on top of espOS's defaults (espos/sdkconfig.d/).
 # Note: values here only apply to a fresh sdkconfig; the same change is
 # made in the local sdkconfig when it already exists.

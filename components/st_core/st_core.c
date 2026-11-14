@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk core task: RX path, polite TX with retries, safety (spec 2, 3.2, 5).
  */
 #include "st_core.h"

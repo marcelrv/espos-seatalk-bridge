@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk 1 PHY: plain data types, shared with st_link and host tests.
  * No ESP-IDF includes here, so this header compiles on a PC.
  */

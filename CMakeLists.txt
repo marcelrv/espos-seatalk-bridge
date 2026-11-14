@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 # SeaTalk 1 <-> Signal K bridge (espOS, ESP-IDF 6.0).
 # Design: ../SeaTalkCore_SPEC.md   Hardware: ../SeaTalkRemote_FIRMWARE.md
 #

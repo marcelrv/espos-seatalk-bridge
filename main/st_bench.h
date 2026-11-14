@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk bench-test application on top of st_core: self-test, RX monitor,
  * simulated boat, per-datagram configuration, statistics.
  */

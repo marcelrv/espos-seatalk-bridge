@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 """Flash WiFi credentials into a seatalk-bridge device's NVS (espOS wifi.ssid0/psk0).
 
 usage (inside the ESP-IDF env, see tools/idf-env.ps1):

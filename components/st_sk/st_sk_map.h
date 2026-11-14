@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Signal K adapter, pure part: path table, own-source check, magnetic
  * fallback and value parsing. No ESP-IDF, no espOS: unit-tested on a PC.
  */

@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Signal K adapter (spec section 7), the espOS side. The pure parts (path
  * table, own-source rule, magnetic fallback, value parsing) are in
  * st_sk_map.c and unit-tested on a PC.

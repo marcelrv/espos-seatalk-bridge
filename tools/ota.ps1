@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 # OTA update of a seatalk-bridge device from this PC.
 #
 #     .\tools\ota.ps1 -Device espos-f768.local

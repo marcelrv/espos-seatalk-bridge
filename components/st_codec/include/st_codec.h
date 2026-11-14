@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk 1 codec (spec section 6): datagram bytes <-> neutral values.
  *
  * Pure C, no ESP-IDF, no Signal K: unit-tested on a PC (test/host).

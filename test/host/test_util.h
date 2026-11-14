@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* Tiny self-contained test framework for host tests. One executable per test
  * file: define tests as `static void test_x(void)`, then in main() use RUN()
  * and `return test_report();`. */

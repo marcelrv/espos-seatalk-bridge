@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Simulated boat for the bench: feeds st_core_set_value() every 500 ms while
  * enabled. Disabled, it stops updating, so the values go stale (stale test).
  */

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 idf_component_register(SRCS st_sk.c st_sk_map.c
                        INCLUDE_DIRS include
                        PRIV_INCLUDE_DIRS .

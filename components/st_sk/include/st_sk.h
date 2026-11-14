@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Signal K adapter (spec section 7): the only part that depends on espOS.
  *
  * Bus -> Signal K: every valid foreign datagram whose type's mode forwards

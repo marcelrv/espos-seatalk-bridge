@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* Host unit tests for the SeaTalk 1 scheduler logic. */
 #include <math.h>
 #include <stdbool.h>

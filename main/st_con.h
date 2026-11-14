@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Console output/input multiplexer for the bench app: printf-style output goes
  * to UART0 and, when connected, to a telnet client (TCP port 23); bytes from
  * the telnet client are fed to st_bench_key().

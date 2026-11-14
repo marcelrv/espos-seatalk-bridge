@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 # Host (PC) unit tests for the pure-C SeaTalk components.
 # Usage:  powershell -File tools\host-test.ps1 [-Clean]
 # Configures into D:\Programming\esp\builds\host-test (outside the synced

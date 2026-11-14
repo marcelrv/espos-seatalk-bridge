@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 """Telnet console for the seatalk-bridge bench app: send keys, capture output.
 
 Default host is espos-f768.local (override with --host). Examples:

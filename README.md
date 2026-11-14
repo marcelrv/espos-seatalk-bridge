@@ -101,3 +101,8 @@ marked `ignore = dirty`, so the patched files don't show in `git status`.
 
 Flash `../st50-emulator/firmware/st50-emulator-merged.bin` at 0x0, or
 `pio run -t upload` in `../st50-emulator`.
+
+## License
+
+Apache-2.0 ([LICENSE](LICENSE)), the same as espOS. Every source file carries
+SPDX headers; [REUSE.toml](REUSE.toml) covers the files that cannot.

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
 ## espOS components come from the espos/ submodule (the prologue adds
 ## espos/components to EXTRA_COMPONENT_DIRS); nothing is fetched for them.
 dependencies:

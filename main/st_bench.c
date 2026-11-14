@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk bench-test application on top of st_core.
  *
  * Threading: st_core's st_task owns the bus (PHY, link, scheduler). This file

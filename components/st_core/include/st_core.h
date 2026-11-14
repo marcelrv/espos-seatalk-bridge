@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk core (spec section 2): the one task that runs the bus.
  *
  * st_task owns st_phy, st_link and st_sched:

@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk 1 PHY, ported from st50-emulator/src/StUart.cpp (Arduino core 2.0.17,
  * IDF 4.4) to ESP-IDF 6. The ISR logic is unchanged; what differs:
  *  - blocking waits use a semaphore given by the ISR / an esp_timer, not

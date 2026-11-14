@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Telnet (TCP port 23) mirror of the bench console.
  *
  * SECURITY: the console is unauthenticated and unencrypted. Anyone on the LAN

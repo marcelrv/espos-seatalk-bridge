@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk 1 scheduler logic (spec section 5.2): what to send next.
  *
  * Pure C, no hardware, no RTOS, time passed in: unit-tested on a PC. Not

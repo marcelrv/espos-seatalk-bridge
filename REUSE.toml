@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+#
+# REUSE (https://reuse.software) metadata for files that cannot carry an SPDX
+# header themselves. Source files carry their own SPDX lines. The espos/
+# submodule is espOS's own and has its own REUSE.toml.
+version = 1
+SPDX-PackageName = "seatalk-bridge"
+SPDX-PackageSupplier = "Marcel Verpaalen"
+
+[[annotations]]
+path = ["**/*.json", "**/*.md", "dependencies.lock", "version.txt"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Marcel Verpaalen"
+SPDX-License-Identifier = "Apache-2.0"
+
+# Changes to espOS; the context lines are espOS code.
+[[annotations]]
+path = ["patches/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["2026 Dirk Wahrheit", "2026 Marcel Verpaalen"]
+SPDX-License-Identifier = "Apache-2.0"

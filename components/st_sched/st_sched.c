@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* SeaTalk 1 scheduler logic: see include/st_sched.h. Pure C, static storage. */
 #include "st_sched.h"
 

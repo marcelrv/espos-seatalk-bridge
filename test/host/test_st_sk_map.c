@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* Host unit tests for the Signal K adapter's pure part, and a check that
  * config/seatalk.json agrees with st_codec_table(). */
 #define _CRT_SECURE_NO_WARNINGS

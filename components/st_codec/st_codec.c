@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* SeaTalk 1 codec: see include/st_codec.h for the contract and sources. */
 #include "st_codec.h"
 

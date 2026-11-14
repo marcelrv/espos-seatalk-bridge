@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk 1 PHY on the classic ESP32 hardware UART (spec section 3).
  *
  * 9th (command) bit: the UART runs 8 data bits + parity; the parity bit sits

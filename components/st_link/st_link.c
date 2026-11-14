@@ -1,4 +1,7 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * SeaTalk 1 link layer: framing, echo suppression, timing diagnostics.
  * Logic from the st50-emulator's Assembler (src/main.cpp).
  */
