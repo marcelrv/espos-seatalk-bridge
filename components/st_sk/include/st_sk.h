@@ -15,6 +15,9 @@
  *   Magnetic fallback: when no fresh headingMagnetic / courseOverGroundMagnetic
  *   arrives, the magnetic value is computed from the true one minus
  *   navigation.magneticVariation (many servers only have the true paths).
+ *   Substitution (stw_from_sog, hdg_from_cog: off / fallback / replace):
+ *   SOG is sent as boat speed (20) and COG as heading (89/9C), for displays
+ *   without SOG/COG pages; fallback only while STW/heading is stale.
  *
  * Config: NVS namespace "seatalk" (config/seatalk.json, edited in the espOS
  *   web UI): per datagram type the mode and period, per quantity the source
@@ -42,6 +45,8 @@ typedef struct {
     uint32_t filtered;      /* updates refused by a source filter */
     uint32_t mag_derived;   /* magnetic values computed from true - variation */
     uint32_t bad_value;     /* updates that weren't a number or null */
+    uint32_t substituted;   /* SOG/COG values used as speed/heading */
+    uint32_t native_dropped; /* STW/heading values ignored in replace mode */
 } st_sk_stats_t;
 
 void st_sk_get_stats(st_sk_stats_t *out);

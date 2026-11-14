@@ -72,6 +72,21 @@ st_sk_val_t st_sk_parse_value(const char *value_json, double *out);
 bool st_sk_derive_mag(bool enabled, int64_t now_ms, double true_v, int64_t mag_ms, double variation,
                       int64_t variation_ms, uint32_t stale_ms, double *mag);
 
+/* Substitution: show SOG as boat speed (datagram 20) and COG as heading
+ * (datagram 89/9C), for displays without SOG/COG pages.
+ *  OFF      : no substitution;
+ *  FALLBACK : the substitute is used only while the native value (STW;
+ *             heading direct or derived) has not arrived within stale_ms;
+ *  REPLACE  : the substitute is always used and the native value is ignored. */
+typedef enum { ST_SK_SUBST_OFF = 0, ST_SK_SUBST_FALLBACK, ST_SK_SUBST_REPLACE } st_sk_subst_t;
+
+/* "off" | "fallback" | "replace" -> mode; false for anything else. */
+bool st_sk_subst_from_name(const char *name, st_sk_subst_t *out);
+
+/* Does a substitute update go to the target quantity? native_ms = last time
+ * the native value was set (ST_SK_NEVER = never). */
+bool st_sk_use_subst(st_sk_subst_t mode, int64_t now_ms, int64_t native_ms, uint32_t stale_ms);
+
 #ifdef __cplusplus
 }
 #endif

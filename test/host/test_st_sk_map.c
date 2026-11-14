@@ -183,6 +183,25 @@ static void test_derive_mag(void)
     CHECK(!st_sk_derive_mag(true, now, 1.0, ST_SK_NEVER, NAN, now, 5000, &m));
 }
 
+static void test_subst(void)
+{
+    st_sk_subst_t m = ST_SK_SUBST_REPLACE;
+    CHECK(st_sk_subst_from_name("off", &m) && m == ST_SK_SUBST_OFF);
+    CHECK(st_sk_subst_from_name("fallback", &m) && m == ST_SK_SUBST_FALLBACK);
+    CHECK(st_sk_subst_from_name("replace", &m) && m == ST_SK_SUBST_REPLACE);
+    CHECK(!st_sk_subst_from_name("Replace", &m));
+    CHECK(!st_sk_subst_from_name("", &m));
+    CHECK(!st_sk_subst_from_name(NULL, &m));
+
+    const int64_t now = 1000000;
+    CHECK(!st_sk_use_subst(ST_SK_SUBST_OFF, now, ST_SK_NEVER, 5000));
+    CHECK(st_sk_use_subst(ST_SK_SUBST_REPLACE, now, now, 5000));
+    /* fallback: only while the native value is missing or stale */
+    CHECK(st_sk_use_subst(ST_SK_SUBST_FALLBACK, now, ST_SK_NEVER, 5000));
+    CHECK(!st_sk_use_subst(ST_SK_SUBST_FALLBACK, now, now - 5000, 5000));
+    CHECK(st_sk_use_subst(ST_SK_SUBST_FALLBACK, now, now - 5001, 5000));
+}
+
 static void test_defective(void)
 {
     CHECK(strcmp(st_sk_defective_path(0x00), "environment.depth.belowTransducer") == 0);
@@ -298,12 +317,19 @@ static void test_descriptor_matches_codec(void)
     k = find_key_line("mag_fallback");
     CHECK(k && line_has(k, "\"type\": \"bool\"") && line_has(k, "\"default\": true"));
 
-    /* Key count: 4 general + 15 modes + 14 periods + 11 sources. */
+    static const char *const subst[] = {"stw_from_sog", "hdg_from_cog"};
+    for (int i = 0; i < 2; i++) {
+        k = find_key_line(subst[i]);
+        CHECK(k && line_has(k, "\"type\": \"string\"") && line_has(k, "\"default\": \"off\"") &&
+              line_has(k, "\"enum\": [\"off\", \"fallback\", \"replace\"]"));
+    }
+
+    /* Key count: 4 general + 2 substitutes + 15 modes + 14 periods + 11 sources. */
     int keys = 0;
     for (const char *p = s_json; (p = strstr(p, "{\"name\": \"")) != NULL; p++) {
         keys++;
     }
-    CHECK_EQ_INT(keys, 4 + 15 + 14 + 11);
+    CHECK_EQ_INT(keys, 4 + 2 + 15 + 14 + 11);
     free(s_json);
 }
 
@@ -315,6 +341,7 @@ int main(void)
     RUN(test_wrap);
     RUN(test_parse_value);
     RUN(test_derive_mag);
+    RUN(test_subst);
     RUN(test_defective);
     RUN(test_descriptor_matches_codec);
     return test_report();

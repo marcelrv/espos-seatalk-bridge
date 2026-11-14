@@ -14,7 +14,7 @@ $ErrorActionPreference = 'Continue'
 $ErrorActionPreference = 'Stop'
 
 # Import the MSVC environment.
-cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+cmd /c "`"$vcvars`" >nul 2>&1 && set" | ForEach-Object {
     $i = $_.IndexOf('=')
     if ($i -gt 0) { Set-Item -Path "Env:$($_.Substring(0, $i))" -Value $_.Substring($i + 1) }
 }

@@ -68,6 +68,13 @@ static mag_state_t s_mag[2] = {{0, ST_SK_NEVER, ST_SK_NEVER}, {0, ST_SK_NEVER, S
 static double s_var;
 static int64_t s_var_ms = ST_SK_NEVER;
 
+/* Substitution (SOG as speed, COG as heading). Modes written by the config
+ * task, read by the stream task; the times are stream task only. */
+static volatile st_sk_subst_t s_stw_subst = ST_SK_SUBST_OFF;
+static volatile st_sk_subst_t s_hdg_subst = ST_SK_SUBST_OFF;
+static int64_t s_stw_native_ms = ST_SK_NEVER; /* STW last set from its own path */
+static int64_t s_hdg_native_ms = ST_SK_NEVER; /* heading last set (direct or derived) */
+
 /* ------------------------------------------------------------ bus -> SK */
 
 static void on_rx(st_link_event_t ev, const st_datagram_t *dg, st_dec_status_t ds, const st_decoded_t *dec,
@@ -111,6 +118,34 @@ static void set_q(st_quantity_t q, double v)
     }
 }
 
+/* A native STW or heading value: dropped in REPLACE mode, else set and
+ * remembered so FALLBACK knows the native path is alive. NaN clears. */
+static void set_native(st_quantity_t q, double v, int64_t now_ms)
+{
+    const bool stw = q == ST_Q_SPEED_THROUGH_WATER;
+    if ((stw ? s_stw_subst : s_hdg_subst) == ST_SK_SUBST_REPLACE) {
+        s_st.native_dropped++;
+        return;
+    }
+    if (isfinite(v)) {
+        *(stw ? &s_stw_native_ms : &s_hdg_native_ms) = now_ms;
+    }
+    set_q(q, v);
+}
+
+/* A SOG or COG value (NaN = cleared) also feeds speed / heading when the
+ * substitution mode says so. */
+static void substitute(st_quantity_t from, double v, int64_t now_ms)
+{
+    const bool sog = from == ST_Q_SPEED_OVER_GROUND;
+    const st_sk_subst_t mode = sog ? s_stw_subst : s_hdg_subst;
+    const int64_t native_ms = sog ? s_stw_native_ms : s_hdg_native_ms;
+    if (st_sk_use_subst(mode, now_ms, native_ms, s_stale_ms) &&
+        st_core_set_value(sog ? ST_Q_SPEED_THROUGH_WATER : ST_Q_HEADING_MAGNETIC, v) == ESP_OK) {
+        s_st.substituted++;
+    }
+}
+
 static void on_sk(const espos_sk_update_t *u, void *arg)
 {
     const st_sk_sub_t *sub = (const st_sk_sub_t *)arg;
@@ -135,18 +170,25 @@ static void on_sk(const espos_sk_update_t *u, void *arg)
     const int64_t now_ms = esp_timer_get_time() / 1000;
 
     switch (sub->role) {
-    case ST_SK_ROLE_DIRECT:
-        if (is_null) {
-            set_q(sub->q, NAN);
-        } else {
+    case ST_SK_ROLE_DIRECT: {
+        const double val = is_null ? NAN : v;
+        if (!is_null) {
             if (sub->q == ST_Q_HEADING_MAGNETIC) {
                 s_mag[0].mag_ms = now_ms;
             } else if (sub->q == ST_Q_COURSE_OVER_GROUND_MAGNETIC) {
                 s_mag[1].mag_ms = now_ms;
             }
-            set_q(sub->q, v);
+        }
+        if (sub->q == ST_Q_SPEED_THROUGH_WATER || sub->q == ST_Q_HEADING_MAGNETIC) {
+            set_native(sub->q, val, now_ms);
+        } else {
+            set_q(sub->q, val);
+        }
+        if (sub->q == ST_Q_SPEED_OVER_GROUND || sub->q == ST_Q_COURSE_OVER_GROUND_MAGNETIC) {
+            substitute(sub->q, val, now_ms);
         }
         break;
+    }
     case ST_SK_ROLE_VARIATION:
         s_var_ms = is_null ? ST_SK_NEVER : now_ms;
         s_var = v;
@@ -162,8 +204,12 @@ static void on_sk(const espos_sk_update_t *u, void *arg)
         m->true_ms = now_ms;
         double mag;
         if (st_sk_derive_mag(s_mag_fallback, now_ms, v, m->mag_ms, s_var, s_var_ms, s_stale_ms, &mag)) {
-            if (st_core_set_value(sub->q, mag) == ESP_OK) {
-                s_st.mag_derived++;
+            s_st.mag_derived++;
+            if (sub->role == ST_SK_ROLE_TRUE_HDG) {
+                set_native(sub->q, mag, now_ms);
+            } else {
+                set_q(sub->q, mag);
+                substitute(sub->q, mag, now_ms);
             }
         }
         break;
@@ -184,6 +230,22 @@ static void apply_config(void)
     st_core_set_idle((uint32_t)idle_us, (uint32_t)jitter_us);
     s_stale_ms = (uint32_t)stale_ms;
     s_mag_fallback = mag_fb;
+
+    static const struct {
+        const char *key;
+        volatile st_sk_subst_t *dst;
+    } subst_keys[] = {{"stw_from_sog", &s_stw_subst}, {"hdg_from_cog", &s_hdg_subst}};
+    for (size_t i = 0; i < sizeof subst_keys / sizeof subst_keys[0]; i++) {
+        char val[16] = "";
+        size_t len = 0;
+        st_sk_subst_t m = ST_SK_SUBST_OFF;
+        if (espos_config_get_str(CFG_NS, subst_keys[i].key, val, sizeof val, &len) != ESP_OK ||
+            !st_sk_subst_from_name(val, &m)) {
+            ESP_LOGW(TAG, "%s: unreadable value '%s', using off", subst_keys[i].key, val);
+            m = ST_SK_SUBST_OFF;
+        }
+        *subst_keys[i].dst = m;
+    }
 
     uint8_t n = 0;
     const st_dgram_info_t *tab = st_codec_table(&n);
@@ -255,6 +317,14 @@ static void check_descriptor(void)
                 ESP_LOGE(TAG, "descriptor lacks key %s (%s)", key, tab[i].name);
                 missing++;
             }
+        }
+    }
+    static const char *const extra[] = {"idle_us", "jitter_us", "stale_ms", "mag_fallback", "stw_from_sog",
+                                        "hdg_from_cog"};
+    for (size_t i = 0; i < sizeof extra / sizeof extra[0]; i++) {
+        if (!espos_config_find_key(ns, extra[i])) {
+            ESP_LOGE(TAG, "descriptor lacks key %s", extra[i]);
+            missing++;
         }
     }
     size_t nq = 0;
@@ -474,6 +544,8 @@ void st_sk_get_stats(st_sk_stats_t *out)
     out->filtered = s_st.filtered;
     out->mag_derived = s_st.mag_derived;
     out->bad_value = s_st.bad_value;
+    out->substituted = s_st.substituted;
+    out->native_dropped = s_st.native_dropped;
 }
 
 const char *st_sk_own_label(void)

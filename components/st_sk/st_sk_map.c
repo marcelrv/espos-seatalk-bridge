@@ -172,3 +172,27 @@ bool st_sk_derive_mag(bool enabled, int64_t now_ms, double true_v, int64_t mag_m
     *mag = st_sk_wrap_2pi(true_v - variation);
     return true;
 }
+
+bool st_sk_subst_from_name(const char *name, st_sk_subst_t *out)
+{
+    static const char *const names[] = {"off", "fallback", "replace"};
+    if (!name || !out) {
+        return false;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (strcmp(name, names[i]) == 0) {
+            *out = (st_sk_subst_t)i;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool st_sk_use_subst(st_sk_subst_t mode, int64_t now_ms, int64_t native_ms, uint32_t stale_ms)
+{
+    switch (mode) {
+    case ST_SK_SUBST_REPLACE: return true;
+    case ST_SK_SUBST_FALLBACK: return native_ms == ST_SK_NEVER || now_ms - native_ms > (int64_t)stale_ms;
+    default: return false;
+    }
+}

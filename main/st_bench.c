@@ -302,9 +302,9 @@ static void print_sk_stats(void)
     st_sk_stats_t k;
     st_sk_get_stats(&k);
     st_con_printf("Signal K: own source %s | published %u, received %u, own-ignored %u, filtered %u, "
-                  "mag derived %u, bad value %u\n",
+                  "mag derived %u, bad value %u, substituted %u, native dropped %u\n",
                   st_sk_own_label(), U(k.published), U(k.received), U(k.own_ignored), U(k.filtered),
-                  U(k.mag_derived), U(k.bad_value));
+                  U(k.mag_derived), U(k.bad_value), U(k.substituted), U(k.native_dropped));
 }
 
 static void handle_cmd(char c)

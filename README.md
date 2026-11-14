@@ -70,10 +70,26 @@ Signal K `$source` filter, plus idle wait, jitter and stale timeout.
 - Without `headingMagnetic` / `courseOverGroundMagnetic` on the server, the
   magnetic value is computed from the true one minus `magneticVariation`.
 - Diagnostics: `espos.<hostname>.seatalk.*` every 10 s.
+- Substitutes (group `Substitutes`): `stw_from_sog` sends SOG as boat speed
+  (datagram 20), `hdg_from_cog` sends COG as heading (89/9C), for displays
+  without SOG/COG pages such as the ST50 Multi. `fallback` uses them only
+  while the real value is stale, `replace` always.
 
 Memory (classic ESP32, no PSRAM): about 42 KB free at rest, ~8 KB less
 while a telnet session is open. `sdkconfig.defaults` trims espOS's Signal K
 batch table to 16 slots for this.
+
+## espOS patches
+
+`patches/espos-*.patch` are local fixes to the `espos/` submodule, applied
+automatically when CMake configures (skipped when already applied; the build
+stops if one no longer applies after a submodule update). The submodule is
+marked `ignore = dirty`, so the patched files don't show in `git status`.
+
+- `espos-0001-schema-from-flash.patch`: the config page failed with
+  `ESP_ERR_NO_MEM` because the 33 KB schema was copied into RAM. Upstream:
+  signalk-espOS/espOS#309; drop the patch once that is merged and the
+  submodule is updated.
 
 ## Host tests
 
