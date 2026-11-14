@@ -106,6 +106,8 @@ web UI, namespace `seatalk`: per datagram type a mode (`off`, `to_sk`,
 `to_bus`, `both`, `auto`) and transmit period, per value an optional
 Signal K `$source` filter, plus idle wait, jitter and stale timeout.
 
+![espOS config page with the SeaTalk bridge settings](docs/config-page.jpg)
+
 - Values this device publishes appear as `$source` `<hostname>.XX`; the
   adapter ignores those on the way back (no SeaTalk → Signal K → SeaTalk loop).
 - Without `headingMagnetic` / `courseOverGroundMagnetic` on the server, the

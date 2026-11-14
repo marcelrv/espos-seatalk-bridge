@@ -9,7 +9,7 @@ SPDX-PackageName = "seatalk-bridge"
 SPDX-PackageSupplier = "Marcel Verpaalen"
 
 [[annotations]]
-path = ["**/*.json", "**/*.md", "dependencies.lock", "version.txt"]
+path = ["**/*.json", "**/*.md", "**/*.png", "**/*.jpg", "dependencies.lock", "version.txt"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Marcel Verpaalen"
 SPDX-License-Identifier = "Apache-2.0"
