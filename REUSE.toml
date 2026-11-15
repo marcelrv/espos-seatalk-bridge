@@ -13,10 +13,3 @@ path = ["**/*.json", "**/*.md", "**/*.png", "**/*.jpg", "dependencies.lock", "ve
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Marcel Verpaalen"
 SPDX-License-Identifier = "Apache-2.0"
-
-# Changes to espOS; the context lines are espOS code.
-[[annotations]]
-path = ["patches/**"]
-precedence = "aggregate"
-SPDX-FileCopyrightText = ["2026 Dirk Wahrheit", "2026 Marcel Verpaalen"]
-SPDX-License-Identifier = "Apache-2.0"

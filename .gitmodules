@@ -3,4 +3,3 @@
 [submodule "espos"]
 	path = espos
 	url = https://github.com/signalk-espOS/espOS.git
-	ignore = dirty

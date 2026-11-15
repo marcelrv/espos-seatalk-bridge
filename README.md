@@ -122,18 +122,6 @@ Memory (classic ESP32, no PSRAM): about 52 KB free at rest in the default
 build (bench console on, telnet and simulator off). `sdkconfig.defaults`
 trims espOS's Signal K batch table to 16 slots to help.
 
-## espOS patches
-
-`patches/espos-*.patch` are local fixes to the `espos/` submodule, applied
-automatically when CMake configures (skipped when already applied; the build
-stops if one no longer applies after a submodule update). The submodule is
-marked `ignore = dirty`, so the patched files don't show in `git status`.
-
-- `espos-0001-schema-from-flash.patch`: the config page failed with
-  `ESP_ERR_NO_MEM` because the 33 KB schema was copied into RAM. Upstream:
-  [signalk-espOS/espOS#309](https://github.com/signalk-espOS/espOS/pull/309);
-  drop the patch once that is merged and the submodule is updated.
-
 ## Host tests
 
 ```powershell
