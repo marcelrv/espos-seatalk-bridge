@@ -35,6 +35,20 @@ menu "SeaTalk bridge"
             (the SeaTalk ESP32 Remote board): an idle UART then drives TX LOW,
             leaving the bus released.
 
+    config ST_BRIDGE_LED_EN_GPIO
+        int "GPIO that enables the RX/TX lights (-1 = none)"
+        range -1 48
+        default 11 if IDF_TARGET_ESP32S3
+        default -1
+        help
+            Output that switches the bus activity lights on and off, driven
+            from the setting seatalk.leds (General, "RX/TX lights"). 11 on
+            the ESP32-S3 SuperMini wiring; -1 when the board has no such pin.
+
+    config ST_BRIDGE_LED_EN_ACTIVE_HIGH
+        bool "HIGH on that GPIO turns the lights on"
+        default y
+
     config ST_BRIDGE_BENCH
         bool "Bench console on USB serial (key commands, statistics)"
         default y

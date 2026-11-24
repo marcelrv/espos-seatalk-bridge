@@ -323,7 +323,7 @@ static void check_descriptor(void)
         }
     }
     static const char *const extra[] = {"idle_us", "jitter_us", "stale_ms", "mag_fallback", "stw_from_sog",
-                                        "hdg_from_cog"};
+                                        "hdg_from_cog", "leds"};
     for (size_t i = 0; i < sizeof extra / sizeof extra[0]; i++) {
         if (!espos_config_find_key(ns, extra[i])) {
             ESP_LOGE(TAG, "descriptor lacks key %s", extra[i]);

@@ -21,6 +21,7 @@
 #endif
 #include "st_con.h"
 #include "st_core.h"
+#include "st_leds.h"
 #include "st_phy.h"
 #include "st_sk.h"
 
@@ -76,6 +77,9 @@ void app_main(void)
     esp_reset_reason_t rr = esp_reset_reason();
 
     ESP_ERROR_CHECK(espos_start(NULL));
+
+    /* RX/TX lights enable pin (if the board has one), from seatalk.leds. */
+    st_leds_start();
 
     /* Console output mux right after espOS and before anything prints, so the
      * output mutex exists for all tasks. The telnet server (if compiled in)
