@@ -46,18 +46,24 @@ idf.py -B <build-dir> -p COMx flash monitor
 ### ESP32-S3 SuperMini
 
 ```powershell
-idf.py -B <s3-build-dir> -D SDKCONFIG=<s3-build-dir>/sdkconfig -D IDF_TARGET=esp32s3 build
+idf.py -B <s3-build-dir> -D SDKCONFIG=sdkconfig.s3 -D IDF_TARGET=esp32s3 build
+idf.py -B <s3-build-dir> menuconfig          # S3 settings: always with -B <s3-build-dir>
 idf.py -B <s3-build-dir> -p COMx flash monitor
 ```
 
 A separate build directory and sdkconfig keep it apart from the ESP32 build.
+`sdkconfig.s3` lives in the project folder (git-ignored), so `fullclean` of
+the build directory keeps your menuconfig changes. Every later `idf.py` call
+for the S3 needs `-B <s3-build-dir>`: without it, idf.py uses the default
+build directory and the ESP32 configuration.
+
 For this target the SeaTalk pins default to RX GPIO13 and TX GPIO12 and the
 console (bench keys included) is on the board's USB-C, the chip's own USB
 Serial/JTAG (`sdkconfig.defaults.esp32s3`). The pins, the UART and whether
-the bus interface inverts are in `idf.py menuconfig` -> SeaTalk bridge. The
-interface must hold the bus released while TX is LOW: the firmware drives TX
-LOW first thing at boot, but during reset and the bootloader the pin floats,
-so it needs a pull-down.
+the bus interface inverts are in `idf.py -B <s3-build-dir> menuconfig` ->
+SeaTalk bridge. The interface must hold the bus released while TX is LOW:
+the firmware drives TX LOW first thing at boot, but during reset and the
+bootloader the pin floats, so it needs a pull-down.
 
 The first configure generates a development signing key,
 `secure_boot_signing_key.pem` (git-ignored). A board flashed with it only
