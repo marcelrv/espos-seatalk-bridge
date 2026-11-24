@@ -26,6 +26,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "hal/uart_ll.h"
+#include "sdkconfig.h"
 #include "soc/gpio_sig_map.h"
 #include "soc/interrupts.h"
 #include "soc/uart_struct.h"
@@ -41,6 +42,16 @@ static const char *TAG = "st_phy";
  * counts it should that assumption ever fail). */
 #define RING 256u
 #define RX_ERR_MASK (UART_INTR_PARITY_ERR | UART_INTR_FRAM_ERR)
+
+/* RX state machine not idle (a character is being received). The register
+ * moved from status to fsm_status after the classic ESP32. */
+#if CONFIG_IDF_TARGET_ESP32
+#define RX_FSM_BUSY(hw) ((hw)->status.st_urx_out != 0)
+#elif CONFIG_IDF_TARGET_ESP32S3
+#define RX_FSM_BUSY(hw) ((hw)->fsm_status.st_urx_out != 0)
+#else
+#error "st_phy: only the classic ESP32 and the ESP32-S3 are supported"
+#endif
 
 static uart_dev_t *s_hw;
 static st_phy_config_t s_cfg;
@@ -466,7 +477,7 @@ uint32_t st_phy_quiet_us(void)
         return 0;
     }
     /* A character in progress: RX state machine not idle, or line low now. */
-    if (s_hw->status.st_urx_out != 0 || st_phy_line_low()) {
+    if (RX_FSM_BUSY(s_hw) || st_phy_line_low()) {
         return 0;
     }
     portENTER_CRITICAL(&s_mux);

@@ -70,8 +70,8 @@ static uint32_t bump_boot_count(void)
 
 void app_main(void)
 {
-    /* Very first thing, before espOS: release the bus (GPIO33 high jams it). */
-    st_phy_tx_hold_low(33);
+    /* Very first thing, before espOS: release the bus (TX high jams it). */
+    st_phy_tx_hold_low(CONFIG_ST_BRIDGE_TX_GPIO);
 
     esp_reset_reason_t rr = esp_reset_reason();
 
@@ -88,6 +88,14 @@ void app_main(void)
                   (unsigned)boots);
 
     st_core_config_t cfg = ST_CORE_CONFIG_DEFAULT();
+    cfg.phy.uart_port = CONFIG_ST_BRIDGE_UART_PORT;
+    cfg.phy.rx_gpio = CONFIG_ST_BRIDGE_RX_GPIO;
+    cfg.phy.tx_gpio = CONFIG_ST_BRIDGE_TX_GPIO;
+#if CONFIG_ST_BRIDGE_INVERT
+    cfg.phy.invert = true;
+#else
+    cfg.phy.invert = false;
+#endif
     esp_err_t err = st_core_start(&cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "st_core_start failed: %s", esp_err_to_name(err));

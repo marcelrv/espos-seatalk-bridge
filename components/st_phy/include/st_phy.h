@@ -2,12 +2,12 @@
  * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
  * SPDX-License-Identifier: Apache-2.0
  *
- * SeaTalk 1 PHY on the classic ESP32 hardware UART (spec section 3).
+ * SeaTalk 1 PHY on the ESP32 / ESP32-S3 hardware UART (spec section 3).
  *
  * 9th (command) bit: the UART runs 8 data bits + parity; the parity bit sits
  * exactly where SeaTalk's command bit is.
  *   RX: cmd = expectedParity(data, current mode) XOR parity-error flag. The
- *       classic ESP32 FIFO keeps no per-byte error flags, so the ISR runs for
+ *       UART FIFO keeps no per-byte error flags, so the ISR runs for
  *       every byte (FIFO threshold 1). Several bytes waiting with a parity
  *       flag set -> all marked AMBIGUOUS.
  *   TX: per byte, EVEN or ODD parity so the parity bit equals the command
@@ -30,9 +30,9 @@ extern "C" {
 #endif
 
 typedef struct {
-    int uart_port; /* UART_NUM_1 on the board */
-    int rx_gpio;   /* 32 */
-    int tx_gpio;   /* 33 */
+    int uart_port; /* UART_NUM_1 */
+    int rx_gpio;   /* 32 on the board; the app sets it from Kconfig */
+    int tx_gpio;   /* 33 on the board; the app sets it from Kconfig */
     bool invert;   /* true on the board: both lines inverted */
 } st_phy_config_t;
 

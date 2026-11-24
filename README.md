@@ -1,7 +1,7 @@
 # seatalk-bridge
 
 SeaTalk 1 <-> Signal K bridge firmware for the SeaTalk ESP32 Remote board
-(classic ESP32). Built on [espOS](https://github.com/signalk-espOS/espOS)
+(classic ESP32) and the ESP32-S3 SuperMini. Built on [espOS](https://github.com/signalk-espOS/espOS)
 (ESP-IDF 6.0), included as the `espos/` submodule.
 
 The design notes live next to this folder in the seatalk-remote project:
@@ -42,6 +42,22 @@ idf.py -B <build-dir> set-target esp32   # once
 idf.py -B <build-dir> build
 idf.py -B <build-dir> -p COMx flash monitor
 ```
+
+### ESP32-S3 SuperMini
+
+```powershell
+idf.py -B <s3-build-dir> -D SDKCONFIG=<s3-build-dir>/sdkconfig -D IDF_TARGET=esp32s3 build
+idf.py -B <s3-build-dir> -p COMx flash monitor
+```
+
+A separate build directory and sdkconfig keep it apart from the ESP32 build.
+For this target the SeaTalk pins default to RX GPIO13 and TX GPIO12 and the
+console (bench keys included) is on the board's USB-C, the chip's own USB
+Serial/JTAG (`sdkconfig.defaults.esp32s3`). The pins, the UART and whether
+the bus interface inverts are in `idf.py menuconfig` -> SeaTalk bridge. The
+interface must hold the bus released while TX is LOW: the firmware drives TX
+LOW first thing at boot, but during reset and the bootloader the pin floats,
+so it needs a pull-down.
 
 The first configure generates a development signing key,
 `secure_boot_signing_key.pem` (git-ignored). A board flashed with it only

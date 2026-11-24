@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+# ESP32-S3 (SuperMini): added by ESP-IDF on top of sdkconfig.defaults.
+# SeaTalk pins default to RX GPIO13 / TX GPIO12 for this target (Kconfig).
+
+# The SuperMini's USB-C goes to the chip's own USB Serial/JTAG, not to a
+# USB-UART bridge: console and bench keys there.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

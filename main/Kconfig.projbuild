@@ -3,6 +3,38 @@
 
 menu "SeaTalk bridge"
 
+    config ST_BRIDGE_UART_PORT
+        int "UART for the SeaTalk bus"
+        range 1 2
+        default 1
+        help
+            Hardware UART used for the bus. UART0 is the console.
+
+    config ST_BRIDGE_RX_GPIO
+        int "SeaTalk RX GPIO"
+        default 13 if IDF_TARGET_ESP32S3
+        default 32
+        help
+            Input from the bus interface. 32 on the SeaTalk ESP32 Remote board
+            (classic ESP32), 13 on the ESP32-S3 SuperMini wiring.
+
+    config ST_BRIDGE_TX_GPIO
+        int "SeaTalk TX GPIO"
+        default 12 if IDF_TARGET_ESP32S3
+        default 33
+        help
+            Output to the bus driver. HIGH pulls the bus low (jams it), so it
+            is driven LOW first thing in app_main. 33 on the SeaTalk ESP32
+            Remote board, 12 on the ESP32-S3 SuperMini wiring.
+
+    config ST_BRIDGE_INVERT
+        bool "Bus interface inverts RX and TX"
+        default y
+        help
+            Yes for a transistor/optocoupler interface that inverts both lines
+            (the SeaTalk ESP32 Remote board): an idle UART then drives TX LOW,
+            leaving the bus released.
+
     config ST_BRIDGE_BENCH
         bool "Bench console on USB serial (key commands, statistics)"
         default y
