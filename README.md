@@ -65,9 +65,11 @@ For this target the SeaTalk pins default to RX GPIO13 and TX GPIO12 and the
 console (bench keys included) is on the board's USB-C, the chip's own USB
 Serial/JTAG (`sdkconfig.defaults.esp32s3`). The pins, the UART and whether
 the bus interface inverts are in `idf.py -B <s3-build-dir> menuconfig` ->
-SeaTalk bridge. The interface must hold the bus released while TX is LOW:
-the firmware drives TX LOW first thing at boot, but during reset and the
-bootloader the pin floats, so it needs a pull-down.
+SeaTalk bridge. GPIO11 enables the RX/TX lights (HIGH = on); switch them in
+the web UI, SeaTalk bridge -> General -> "RX/TX lights" (`seatalk.leds`). The
+interface must hold the bus released while TX is LOW: the firmware drives TX
+LOW first thing at boot, but during reset and the bootloader the pin floats,
+so it needs a pull-down.
 
 The first configure generates a development signing key,
 `secure_boot_signing_key.pem` (git-ignored). A board flashed with it only

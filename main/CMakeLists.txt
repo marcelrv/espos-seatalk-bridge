@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Marcel Verpaalen
 # SPDX-License-Identifier: Apache-2.0
-set(srcs main.c st_con.c)
+set(srcs main.c st_con.c st_leds.c)
 if(CONFIG_ST_BRIDGE_BENCH)
     list(APPEND srcs st_bench.c)
 endif()

@@ -320,6 +320,9 @@ static void test_descriptor_matches_codec(void)
           line_number_after(k, "\"max\": ") == 60000);
     k = find_key_line("mag_fallback");
     CHECK(k && line_has(k, "\"type\": \"bool\"") && line_has(k, "\"default\": true"));
+    k = find_key_line("leds");
+    CHECK(k && line_has(k, "\"type\": \"bool\"") && line_has(k, "\"default\": true") &&
+          line_has(k, "\"group\": \"General\""));
 
     static const char *const subst[] = {"stw_from_sog", "hdg_from_cog"};
     for (int i = 0; i < 2; i++) {
@@ -328,12 +331,12 @@ static void test_descriptor_matches_codec(void)
               line_has(k, "\"enum\": [\"off\", \"fallback\", \"replace\"]"));
     }
 
-    /* Key count: 4 general + 2 substitutes + 15 modes + 14 periods + 11 sources. */
+    /* Key count: 5 general + 2 substitutes + 15 modes + 14 periods + 11 sources. */
     int keys = 0;
     for (const char *p = s_json; (p = strstr(p, "{\"name\": \"")) != NULL; p++) {
         keys++;
     }
-    CHECK_EQ_INT(keys, 4 + 2 + 15 + 14 + 11);
+    CHECK_EQ_INT(keys, 5 + 2 + 15 + 14 + 11);
     free(s_json);
 }
 

@@ -8,3 +8,7 @@
 # 16 is plenty (bus values + 20 diagnostics per 10 s; a full batch just
 # closes early) and saves ~6 KB on the classic ESP32 (no PSRAM).
 CONFIG_ESPOS_SK_PENDING_MAX=16
+
+# espOS config change listeners: espOS's own modules plus three of ours
+# (st_sk, telnet console, RX/TX lights) come close to the default of 8.
+CONFIG_ESPOS_CONFIG_MAX_SUBSCRIBERS=12
