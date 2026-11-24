@@ -6,3 +6,15 @@
 # The SuperMini's USB-C goes to the chip's own USB Serial/JTAG, not to a
 # USB-UART bridge: console and bench keys there.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# PSRAM: most SuperMinis (ESP32-S3FH4R2) carry 2 MB of quad PSRAM.
+# Allocations above 256 bytes go there (IDF's default of 16 KB moved almost
+# nothing: the PSRAM driver then cost ~6 KB of internal RAM for no gain).
+# Task stacks, WiFi/lwIP buffers, DMA and anything that asks for internal
+# memory, and the SeaTalk ISR and ring stay internal. WiFi/lwIP in PSRAM
+# (SPIRAM_TRY_ALLOCATE_WIFI_LWIP) stays off: espOS saw WiFi fail with it.
+# IGNORE_NOTFOUND: the same image still boots on a board without PSRAM.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=256

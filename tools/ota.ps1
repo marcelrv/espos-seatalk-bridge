@@ -42,10 +42,12 @@ if ($ApiKey) { $headers['Authorization'] = "Bearer $ApiKey" }
 $base = "http://$Device/api/v1"
 try {
     Start-Sleep -Milliseconds 800
+    $startSlot = (Invoke-RestMethod -Uri "$base/ota/status" -Headers $headers -TimeoutSec 10).running.slot
     $body = @{ url = "http://$myIp`:$Port/$name" } | ConvertTo-Json -Compress
     $r = Invoke-RestMethod -Method Post -Uri "$base/ota" -Body $body -ContentType 'application/json' -Headers $headers
     Write-Host "install requested: $($r | ConvertTo-Json -Compress)"
 
+    $restarted = $false
     $deadline = (Get-Date).AddMinutes(5)
     $last = ''
     while ((Get-Date) -lt $deadline) {
@@ -60,9 +62,12 @@ try {
         if ($s.last_error) { $line += "  error: $($s.last_error)" }
         if ($line -ne $last) { Write-Host $line; $last = $line }
         if ($s.state -in @('ready', 'failed')) { break }
+        # A fast restart can fall between two polls, so 'ready' is never seen:
+        # already running from the other slot means it is done.
+        if ($s.running.slot -ne $startSlot) { $restarted = $true; break }
     }
     # After 'ready' the device restarts into the new slot ~1.5 s later.
-    Start-Sleep -Seconds 15
+    if (-not $restarted) { Start-Sleep -Seconds 15 }
     $s = Invoke-RestMethod -Uri "$base/ota/status" -Headers $headers -TimeoutSec 10
     Write-Host "now running $($s.running.version) in $($s.running.slot) (other: $($s.running.other_version), rolled_back $($s.running.rolled_back))"
 } finally {
