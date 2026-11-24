@@ -54,7 +54,7 @@ try:
         w.writerow(["psk0", "data", "string", psk])
     subprocess.run([sys.executable, "-m", "esp_idf_nvs_partition_gen", "generate", csv_path, bin_path, NVS_SIZE],
                    check=True, stdout=subprocess.DEVNULL)
-    subprocess.run([sys.executable, "-m", "esptool", "-p", a.port, "--chip", "esp32", "--connect-attempts", "0",
+    subprocess.run([sys.executable, "-m", "esptool", "-p", a.port, "--connect-attempts", "0",
                     "-b", a.baud, "write-flash", NVS_OFFSET, bin_path], check=True)
     print("WiFi credentials written; the device restarts and joins the network.")
 finally:

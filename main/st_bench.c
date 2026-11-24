@@ -19,6 +19,10 @@
 #include <string.h>
 
 #include "driver/uart.h"
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+#include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_vfs.h"
+#endif
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -413,12 +417,54 @@ void st_bench_key(char c)
     }
 }
 
+/* Console key input: UART0, or USB Serial/JTAG (see bench_task). */
+static bool console_in_init(void)
+{
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    if (!usb_serial_jtag_is_driver_installed()) {
+        usb_serial_jtag_driver_config_t ucfg = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
+        const esp_err_t err = usb_serial_jtag_driver_install(&ucfg);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "usb_serial_jtag_driver_install failed: %s; USB keys disabled", esp_err_to_name(err));
+            return false;
+        }
+        usb_serial_jtag_vfs_use_driver();
+    }
+    return true;
+#else
+    if (!uart_is_driver_installed(UART_NUM_0)) {
+        const esp_err_t err = uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "uart_driver_install(UART0) failed: %s; USB serial keys disabled", esp_err_to_name(err));
+            return false;
+        }
+    }
+    return true;
+#endif
+}
+
+static bool console_read(uint8_t *c, TickType_t ticks)
+{
+#if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    return usb_serial_jtag_read_bytes(c, 1, ticks) == 1;
+#else
+    return uart_read_bytes(UART_NUM_0, c, 1, ticks) == 1;
+#endif
+}
+
 /*
- * The one bench task. Keys come from UART0 (USB serial) and from the queue
- * (telnet, via st_bench_key()). A UART driver is installed only for RX
- * (uart_read_bytes). uart_vfs_dev_use_driver() is NOT called: stdout/printf and
- * ESP_LOG keep using the polling console TX path set up at boot, so logging is
- * unaffected, and we avoid stdin going through the driver.
+ * The one bench task. Keys come from the console (UART0, or the chip's own
+ * USB on an ESP32-S3 with the USB Serial/JTAG console) and from the queue
+ * (telnet, via st_bench_key()).
+ *
+ * UART0: a driver is installed only for RX (uart_read_bytes).
+ * uart_vfs_dev_use_driver() is NOT called: stdout/printf and ESP_LOG keep
+ * using the polling console TX path set up at boot, so logging is unaffected.
+ *
+ * USB Serial/JTAG: the driver owns the peripheral once installed, so stdout
+ * is switched to it too (usb_serial_jtag_vfs_use_driver). Its TX gives up
+ * after one 50 ms timeout when no PC reads the port, so output to an
+ * unplugged USB never blocks the bridge.
  *
  * Stack 4096: the deepest path is print_stats()/print_table() (a stats struct
  * or slot plus printf with float conversion, ~1.5 KB deep); the 256-char
@@ -427,14 +473,7 @@ void st_bench_key(char c)
 static void bench_task(void *arg)
 {
     (void)arg;
-    bool uart_ok = true;
-    if (!uart_is_driver_installed(UART_NUM_0)) {
-        const esp_err_t err = uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "uart_driver_install(UART0) failed: %s; USB serial keys disabled", esp_err_to_name(err));
-            uart_ok = false;
-        }
-    }
+    const bool uart_ok = console_in_init();
     st_bench_print_help();
 
     s_load_t_us = esp_timer_get_time();
@@ -446,8 +485,7 @@ static void bench_task(void *arg)
          * keeps the task busy. */
         uint8_t c;
         if (uart_ok) {
-            if (uart_read_bytes(UART_NUM_0, &c, 1, s_continuous ? 0 : pdMS_TO_TICKS(100)) == 1 && c != '\r' &&
-                c != '\n') {
+            if (console_read(&c, s_continuous ? 0 : pdMS_TO_TICKS(100)) && c != '\r' && c != '\n') {
                 handle_cmd((char)c);
             }
         } else {
