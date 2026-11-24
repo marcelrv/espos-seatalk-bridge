@@ -40,7 +40,11 @@ static void apply_cb(void *arg)
     bool on = true;
     (void)espos_config_get_bool(CFG_NS, CFG_KEY, &on);
     gpio_set_level(PIN, LEVEL(on));
-    ESP_LOGI(TAG, "RX/TX lights %s (GPIO%d %s)", on ? "on" : "off", (int)PIN, LEVEL(on) ? "high" : "low");
+    /* Read the pad back: a level that differs means something on the board
+     * holds the line. */
+    const int pad = gpio_get_level(PIN);
+    ESP_LOGI(TAG, "RX/TX lights %s (GPIO%d set %s, reads %s)", on ? "on" : "off", (int)PIN,
+             LEVEL(on) ? "high" : "low", pad ? "high" : "low");
 }
 
 static void on_config_change(const char *ns, const char *key, void *arg)
@@ -61,7 +65,7 @@ void st_leds_start(void)
     gpio_set_level(PIN, LEVEL(true));
     const gpio_config_t io = {
         .pin_bit_mask = 1ULL << CONFIG_ST_BRIDGE_LED_EN_GPIO,
-        .mode = GPIO_MODE_OUTPUT,
+        .mode = GPIO_MODE_INPUT_OUTPUT, /* input too, for the read-back */
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
