@@ -99,7 +99,7 @@ void      st_core_stats(st_stats_t *out);
   `odd = parity8(data) != cmdBit`.
 - **RX:** `cmdBit = expectedParityBit(data, currentMode) XOR parityErrorFlag`.
   When idle the mode is EVEN. While we transmit, it's whatever was set for the byte being sent, so echo bytes decode correctly too.
-- `conf0.err_wr_mask = 0`, so bytes with a parity "error" (= command bit 1) are kept.
+- `conf0.err_wr_mask = 0`, so bytes received with the parity-error flag set are still stored in the RX FIFO (the command bit is then recovered via the RX formula above, not equated with a parity error).
 
 ### 3.4 RX interrupt
 - RX FIFO full threshold **1**: the ISR runs for every byte. ISR in IRAM (`ESP_INTR_FLAG_IRAM`). No flash calls, no `__builtin_parity`.
@@ -217,7 +217,7 @@ Pure functions, SI units in and out (Signal K conventions: m, m/s, rad, K). Unit
 | 9C | `9C U1 VW RR` | Heading + rudder | `navigation.headingMagnetic`, `steering.rudderAngle` | ↔ | ✓ |
 | 30 | `30 X0 0Y` | Lamp level (ST50 sends `30 70 0X`) | – (internal / optional) | ← ST | **measured** RX |
 
-Heading encoding (53/89/9C): `deg = (U & 3)*90 + (VW & 0x3F)*2 + odd`. The odd-degree flag sits in the high bits of U (0x8 for 53, 0x4 for 89/9C); see the emulator's `encodeHeading()`.
+Heading encoding (53/89/9C): base `deg = (U & 3)*90 + (VW & 0x3F)*2 + corr`. Per Knauf rev. 3.23, the fine correction is command-specific: for `53` and `89`, `corr = (U & 0xC) / 8` (e.g., `89 82 00 00 20` → 1°); for `9C`, `corr` is the number of set bits in `U & 0xC` (`0` for `0x0`, `1` for `0x4`/`0x8`, `2` for `0xC`, e.g., `9C 81 00 00` → 1°).
 
 **Decoder rules:**
 - Respect the unit/flag bits that Signal K's own parser ignores: metric flag in 00 (Y & 4), m/s flag in 11 (0x80), validity/MPH flags in 26.

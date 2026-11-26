@@ -64,7 +64,7 @@ For a UART this means: **invert both RX and TX.** On the Arduino core, for examp
 ### TX safety rules
 1. **GPIO33 high for longer than one character jams the whole SeaTalk bus.** Every instrument and the autopilot go deaf. Make sure no code path, crash or debugger halt can leave it high.
 2. **Set GPIO33 to output LOW as early as possible in startup.** During reset and boot, GPIO33 floats and R7 keeps the bus released. GPIO33 is not a strapping pin, so it doesn't glitch during boot.
-3. If you use the UART with TX inversion: an inverted UART TX idles **high** until it is configured. Configure the inversion before you attach the pin, or set the pin up as GPIO LOW first.
+3. If you use the UART with TX inversion: an uninverted UART TX idles **high** until inversion is configured. Always do **both** steps in order (matching `docs/protocol.md` §3.2): initialize GPIO33 as output LOW first, then configure UART TX inversion **before** routing UART TX to the pin.
 4. Consider a watchdog that forces GPIO33 low if the line has been driven for more than about 3 ms (one 11-bit character at 4800 baud is 2.29 ms).
 
 ---
