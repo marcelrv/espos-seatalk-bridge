@@ -77,8 +77,12 @@ accepts OTA images signed with the same key: back it up.
 
 ```powershell
 python tools/provision_wifi.py --port COMx --secrets <secrets.ini>   # WiFi into NVS (resets NVS)
-.\tools\ota.ps1 -Device <hostname>.local                            # serve the build from this PC and install it over WiFi
+.\tools\ota.ps1 -Device <hostname>.local -Image <build-dir>\seatalk_bridge.bin   # serve the build from this PC and install it over WiFi
 ```
+
+Pass `-Image` with the build directory of the board's chip (`<s3-build-dir>`
+for the S3): without it, `ota.ps1` serves a fixed default path. The device
+refuses an image built for the other chip.
 
 `secrets.ini` has a `[secrets]` section with `wifi_ssid` and `wifi_password`
 (default: the st50-emulator's, next to this folder). The device's hostname is
