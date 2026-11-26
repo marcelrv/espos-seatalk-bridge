@@ -18,6 +18,9 @@
 
 static const char *TAG = "st_leds";
 
+/* Board-owned namespace (moved out of the component's "seatalk" namespace;
+ * espOS config migrations are intra-namespace, so an upgrade from pre-0.5
+ * bench builds intentionally resets seatalk_hw.leds to its default of on). */
 #define CFG_NS "seatalk_hw"
 #define CFG_KEY "leds"
 

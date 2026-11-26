@@ -41,6 +41,7 @@ typedef struct {
     int led_en_pin;
     bool led_act_hi;
     bool bus_valid;
+    bool default_tx_held;
 } hw_cfg_t;
 
 static int validate_gpio(const char *key, int pin, bool output)
@@ -90,22 +91,24 @@ static esp_err_t before_network_cb(void *arg)
     hw->invert = invert;
     hw->led_act_hi = led_act_hi;
 
+    hw->bus_valid = (hw->rx_pin >= 0 && hw->tx_pin >= 0 && hw->rx_pin != hw->tx_pin);
     if (hw->rx_pin >= 0 && hw->tx_pin >= 0 && hw->rx_pin == hw->tx_pin) {
         ESP_LOGE(TAG, "%s: RX and TX cannot both be GPIO %d", HW_NS, hw->tx_pin);
-        hw->rx_pin = -1;
-        hw->tx_pin = -1;
     }
-    hw->bus_valid = (hw->rx_pin >= 0 && hw->tx_pin >= 0);
 
     /* If the user configured a different valid TX pin (or non-inverting mode),
      * apply safe idle state immediately before Wi-Fi starts and release the
-     * unused default pin back to reset state. */
+     * unused default pin only if startup actually acquired it. */
     if (hw->tx_pin >= 0) {
         if (hw->invert && hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO) {
             st_phy_tx_hold_low(hw->tx_pin);
+            if (hw->default_tx_held) {
+                gpio_reset_pin((gpio_num_t)CONFIG_ST_BRIDGE_TX_GPIO);
+                hw->default_tx_held = false;
+            }
+        } else if (!hw->invert && hw->default_tx_held) {
             gpio_reset_pin((gpio_num_t)CONFIG_ST_BRIDGE_TX_GPIO);
-        } else if (!hw->invert) {
-            gpio_reset_pin((gpio_num_t)CONFIG_ST_BRIDGE_TX_GPIO);
+            hw->default_tx_held = false;
         }
     }
 
@@ -164,11 +167,13 @@ static uint32_t bump_boot_count(void)
 
 void app_main(void)
 {
+    bool default_tx_held = false;
     /* Very first thing, before espOS: release the bus on the default TX pin
      * (TX HIGH jams the SeaTalk 1 bus). */
     if (GPIO_IS_VALID_OUTPUT_GPIO(CONFIG_ST_BRIDGE_TX_GPIO) &&
         !esp_gpio_is_reserved(BIT64(CONFIG_ST_BRIDGE_TX_GPIO))) {
         st_phy_tx_hold_low(CONFIG_ST_BRIDGE_TX_GPIO);
+        default_tx_held = true;
     }
 
     hw_cfg_t hw = {
@@ -178,6 +183,7 @@ void app_main(void)
         .led_en_pin = -1,
         .led_act_hi = true,
         .bus_valid = false,
+        .default_tx_held = default_tx_held,
     };
 
     espos_start_opts_t opts = ESPOS_START_OPTS_DEFAULT;
