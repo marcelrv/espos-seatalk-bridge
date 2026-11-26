@@ -21,6 +21,8 @@
  */
 #include "st_sk.h"
 
+#ifdef ESPOS_SEATALK_HAVE_SK
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -555,3 +557,26 @@ const char *st_sk_own_label(void)
 {
     return s_host;
 }
+
+#else /* !ESPOS_SEATALK_HAVE_SK */
+
+#include <string.h>
+
+esp_err_t st_sk_start(void)
+{
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+void st_sk_get_stats(st_sk_stats_t *out)
+{
+    if (out) {
+        memset(out, 0, sizeof *out);
+    }
+}
+
+const char *st_sk_own_label(void)
+{
+    return "";
+}
+
+#endif /* ESPOS_SEATALK_HAVE_SK */

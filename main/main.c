@@ -14,16 +14,14 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "espos.h"
+#include "espos_seatalk.h"
 #include "nvs.h"
 #include "sdkconfig.h"
 #if CONFIG_ST_BRIDGE_BENCH
 #include "st_bench.h"
 #endif
 #include "st_con.h"
-#include "st_core.h"
 #include "st_leds.h"
-#include "st_phy.h"
-#include "st_sk.h"
 
 static const char *TAG = "seatalk-bridge";
 
@@ -100,14 +98,9 @@ void app_main(void)
 #else
     cfg.phy.invert = false;
 #endif
-    esp_err_t err = st_core_start(&cfg);
+    esp_err_t err = espos_seatalk_start(&cfg);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "st_core_start failed: %s", esp_err_to_name(err));
-    } else {
-        err = st_sk_start();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "st_sk_start failed: %s", esp_err_to_name(err));
-        }
+        ESP_LOGE(TAG, "espos_seatalk_start failed: %s", esp_err_to_name(err));
     }
 
 #if CONFIG_ST_BRIDGE_BENCH

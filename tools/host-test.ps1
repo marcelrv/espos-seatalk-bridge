@@ -23,7 +23,7 @@ cmd /c "`"$vcvars`" >nul 2>&1 && set" | ForEach-Object {
 
 if ($Clean -and (Test-Path $build)) { Remove-Item -Recurse -Force $build }
 
-& cmake -G Ninja -DCMAKE_C_COMPILER=cl -S (Join-Path $root 'test\host') -B $build
+& cmake -G Ninja -DCMAKE_C_COMPILER=cl -S (Join-Path $root 'components\espos_seatalk\test\host') -B $build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & cmake --build $build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
