@@ -9,4 +9,6 @@ dependencies:
   signalk-espos/espos_ota:
     version: "^0.29.1"
   espos_seatalk:
-    path: "../../.."
+    git: "https://github.com/marcelrv/espos-seatalk-bridge.git"
+    path: "components/espos_seatalk"
+    override_path: "../../.."

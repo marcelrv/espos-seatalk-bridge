@@ -36,7 +36,8 @@ reviews:
         - anything that allows a runtime SeaTalk or LED GPIO to land on a
           reserved flash/PSRAM pin or invalid GPIO without validation;
         - breaking changes to the "seatalk" NVS config namespace keys;
-        - board-specific pins or LED settings leaking into components/espos_seatalk/;
+        - board-specific pins or LED settings leaking into components/espos_seatalk/
+          (standalone sample apps under components/espos_seatalk/examples/ are exempt);
         - partition table changes presented as reaching fielded devices via OTA;
         - committed signing keys (*.pem), credentials, or LAN addresses;
         - version bumps outside release-please PRs or AI attribution in commits.

@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+
+menu "SeaTalk example wiring"
+
+    config EXAMPLE_SEATALK_RX_GPIO
+        int "SeaTalk RX GPIO"
+        default 13 if IDF_TARGET_ESP32S3
+        default 32
+        help
+            GPIO connected to the SeaTalk RX interface. Avoid SPI flash and
+            PSRAM pins (for example GPIO26-37 on ESP32-S3).
+
+    config EXAMPLE_SEATALK_TX_GPIO
+        int "SeaTalk TX GPIO"
+        default 12 if IDF_TARGET_ESP32S3
+        default 33
+        help
+            GPIO connected to the SeaTalk TX driver. Must be held LOW at boot
+            so the SeaTalk bus stays released.
+
+    config EXAMPLE_SEATALK_INVERT
+        bool "Bus interface inverts RX and TX"
+        default y
+        help
+            Enable for transistor/optocoupler interfaces that invert both lines.
+
+endmenu

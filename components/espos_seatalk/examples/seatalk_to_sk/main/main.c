@@ -9,26 +9,22 @@
 #include "espos_seatalk.h"
 #include "sdkconfig.h"
 
-#if CONFIG_IDF_TARGET_ESP32S3
-#define SEATALK_RX_GPIO 13
-#define SEATALK_TX_GPIO 12
-#else
-#define SEATALK_RX_GPIO 32
-#define SEATALK_TX_GPIO 33
-#endif
-
 void app_main(void)
 {
     /* Release the SeaTalk bus first thing at boot (TX HIGH jams the bus). */
-    st_phy_tx_hold_low(SEATALK_TX_GPIO);
+    st_phy_tx_hold_low(CONFIG_EXAMPLE_SEATALK_TX_GPIO);
 
     ESP_ERROR_CHECK(espos_start(NULL));
 
     st_core_config_t cfg = ST_CORE_CONFIG_DEFAULT();
     cfg.phy.uart_port = 1;
-    cfg.phy.rx_gpio = SEATALK_RX_GPIO;
-    cfg.phy.tx_gpio = SEATALK_TX_GPIO;
+    cfg.phy.rx_gpio = CONFIG_EXAMPLE_SEATALK_RX_GPIO;
+    cfg.phy.tx_gpio = CONFIG_EXAMPLE_SEATALK_TX_GPIO;
+#if CONFIG_EXAMPLE_SEATALK_INVERT
     cfg.phy.invert = true;
+#else
+    cfg.phy.invert = false;
+#endif
 
     ESP_ERROR_CHECK(espos_seatalk_start(&cfg));
 }

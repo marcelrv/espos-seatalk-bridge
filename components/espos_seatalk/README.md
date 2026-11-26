@@ -14,19 +14,31 @@ Signal K bridge component for ESP-IDF 6 (`esp32` and `esp32s3`).
 
 ## Quick start
 
+Choose free GPIOs for your chip (on ESP32-S3, avoid SPI flash / PSRAM pins
+GPIO26–37):
+
 ```c
 #include "espos.h"
 #include "espos_seatalk.h"
+#include "sdkconfig.h"
+
+#if CONFIG_IDF_TARGET_ESP32S3
+#define SEATALK_RX_GPIO 13
+#define SEATALK_TX_GPIO 12
+#else
+#define SEATALK_RX_GPIO 32
+#define SEATALK_TX_GPIO 33
+#endif
 
 void app_main(void)
 {
-    st_phy_tx_hold_low(33);          /* release bus immediately on boot */
+    st_phy_tx_hold_low(SEATALK_TX_GPIO); /* release bus immediately on boot */
     ESP_ERROR_CHECK(espos_start(NULL));
 
     st_core_config_t cfg = ST_CORE_CONFIG_DEFAULT();
     cfg.phy.uart_port = 1;
-    cfg.phy.rx_gpio = 32;
-    cfg.phy.tx_gpio = 33;
+    cfg.phy.rx_gpio = SEATALK_RX_GPIO;
+    cfg.phy.tx_gpio = SEATALK_TX_GPIO;
     cfg.phy.invert = true;
     ESP_ERROR_CHECK(espos_seatalk_start(&cfg));
 }
