@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+
+language: en-US
+
+reviews:
+  profile: assertive
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "chore: release"
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "github-actions[bot]"
+
+  path_filters:
+    - "!managed_components/**"
+    - "!build*/**"
+    - "!espos/**"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        espos-seatalk-bridge is ESP-IDF firmware on espOS (the espos/
+        submodule) bridging a Raymarine SeaTalk 1 bus and Signal K. The
+        reusable SeaTalk 1 stack lives in components/espos_seatalk/ and must
+        keep its lower layers (phy, link, codec, sched, core) free of espOS
+        dependencies and GPIO pin assumptions; only src/sk/ may depend on
+        espos_sk, espos_config, and espos_net (optionally).
+
+        Flag:
+        - anything that could leave the SeaTalk TX GPIO driven HIGH at boot,
+          on error, or across config changes (HIGH jams the entire boat bus);
+        - anything that allows a runtime SeaTalk or LED GPIO to land on a
+          reserved flash/PSRAM pin or invalid GPIO without validation;
+        - breaking changes to the "seatalk" NVS config namespace keys;
+        - board-specific pins or LED settings leaking into components/espos_seatalk/;
+        - partition table changes presented as reaching fielded devices via OTA;
+        - committed signing keys (*.pem), credentials, or LAN addresses;
+        - version bumps outside release-please PRs or AI attribution in commits.
+
+knowledge_base:
+  linked_repositories:
+    - repository: signalk-espOS/espOS
+      instructions: >-
+        The runtime pinned as the espos/ submodule: the prologue
+        (cmake/espos_project.cmake), espos_config descriptors and codegen,
+        espos_sk, espos_ota, espos_httpd, and the reusable
+        release-firmware.yml / build-firmware.yml workflows.

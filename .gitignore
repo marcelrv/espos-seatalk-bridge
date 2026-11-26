@@ -1,12 +1,16 @@
 # SPDX-FileCopyrightText: 2026 Marcel Verpaalen
 # SPDX-License-Identifier: Apache-2.0
+
 # Build output
 build/
+build-*/
 managed_components/
+dependencies.lock
 sdkconfig
 sdkconfig.old
 sdkconfig.s3
 sdkconfig.s3.old
+sdkconfig.local
 
 # Signing keys: a committed key lets anyone sign firmware the device accepts
 *.pem
@@ -19,3 +23,4 @@ secrets.ini
 
 # Host tests
 test/host/build/
+components/espos_seatalk/test/host/build/
