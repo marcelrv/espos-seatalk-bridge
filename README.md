@@ -55,7 +55,11 @@ A separate build directory and sdkconfig keep it apart from the ESP32 build.
 `sdkconfig.s3` lives in the project folder (git-ignored), so `fullclean` of
 the build directory keeps your menuconfig changes. Every later `idf.py` call
 for the S3 needs `-B <s3-build-dir>`: without it, idf.py uses the default
-build directory and the ESP32 configuration.
+build directory and the ESP32 configuration. After `fullclean`, or in a new
+build directory, `-B` alone is not enough: the build directory no longer
+remembers `sdkconfig.s3` or the target, and idf.py falls back to the ESP32
+and the project's `sdkconfig` (and rewrites it). Run the first command again,
+with both `-D` options, before `menuconfig` or `flash`.
 
 For this target the SeaTalk pins default to RX GPIO13 and TX GPIO12 and the
 console (bench keys included) is on the board's USB-C, the chip's own USB
