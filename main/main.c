@@ -2,29 +2,123 @@
  * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
  * SPDX-License-Identifier: Apache-2.0
  *
- * seatalk-bridge: SeaTalk 1 <-> Signal K bridge on espOS.
+ * espos-seatalk-bridge: Raymarine SeaTalk 1 <-> Signal K bridge on espOS.
  *
- * Bench-test application on st_core: self-test, RX monitor, simulated boat,
- * statistics.
+ * Bus safety: TX HIGH jams the entire SeaTalk 1 bus. The chip's default TX
+ * pin is driven LOW as the very first line of app_main(); if the user
+ * overrode seatalk_hw.tx_pin in NVS, before_network() drives that validated
+ * pin LOW right after espos_init() loads config and before Wi-Fi starts.
  */
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 
+#include "driver/gpio.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_private/esp_gpio_reserve.h"
 #include "esp_system.h"
 #include "espos.h"
+#include "espos_config.h"
 #include "espos_seatalk.h"
-#include "nvs.h"
 #include "sdkconfig.h"
-#if CONFIG_ST_BRIDGE_BENCH
-#include "st_bench.h"
-#endif
-#include "st_con.h"
+#include "st_api.h"
 #include "st_leds.h"
+#if CONFIG_ST_BRIDGE_BENCH
+#include "nvs.h"
+#include "st_bench.h"
+#include "st_con.h"
+#endif
 
 static const char *TAG = "seatalk-bridge";
 
+#define HW_NS "seatalk_hw"
+
+typedef struct {
+    int rx_pin;
+    int tx_pin;
+    bool invert;
+    int led_en_pin;
+    bool led_act_hi;
+    bool bus_valid;
+} hw_cfg_t;
+
+static int validate_gpio(const char *key, int pin, bool output)
+{
+    if (pin < 0) {
+        return -1;
+    }
+    const bool valid = output ? GPIO_IS_VALID_OUTPUT_GPIO(pin) : GPIO_IS_VALID_GPIO(pin);
+    if (!valid) {
+        ESP_LOGE(TAG, "%s.%s: GPIO %d cannot be used as %s on this chip", HW_NS, key, pin,
+                 output ? "an output" : "an input");
+        return -1;
+    }
+    if (esp_gpio_is_reserved(BIT64(pin))) {
+        ESP_LOGE(TAG, "%s.%s: GPIO %d is reserved by flash or PSRAM", HW_NS, key, pin);
+        return -1;
+    }
+    return pin;
+}
+
+static esp_err_t before_network_cb(void *arg)
+{
+    hw_cfg_t *hw = (hw_cfg_t *)arg;
+
+    int32_t rx = -1;
+    if (espos_config_get_i32(HW_NS, "rx_pin", &rx) != ESP_OK || rx < 0) {
+        rx = CONFIG_ST_BRIDGE_RX_GPIO;
+    }
+    int32_t tx = -1;
+    if (espos_config_get_i32(HW_NS, "tx_pin", &tx) != ESP_OK || tx < 0) {
+        tx = CONFIG_ST_BRIDGE_TX_GPIO;
+    }
+    bool invert = true;
+    (void)espos_config_get_bool(HW_NS, "invert", &invert);
+
+    int32_t led_en = -1;
+    if (espos_config_get_i32(HW_NS, "led_en_pin", &led_en) != ESP_OK || led_en == -1) {
+        led_en = CONFIG_ST_BRIDGE_LED_EN_GPIO;
+    } else if (led_en <= -2) {
+        led_en = -1; /* explicitly disabled */
+    }
+    bool led_act_hi = true;
+    (void)espos_config_get_bool(HW_NS, "led_act_hi", &led_act_hi);
+
+    hw->rx_pin = validate_gpio("rx_pin", (int)rx, false);
+    hw->tx_pin = validate_gpio("tx_pin", (int)tx, true);
+    hw->invert = invert;
+    hw->led_act_hi = led_act_hi;
+
+    if (hw->rx_pin >= 0 && hw->tx_pin >= 0 && hw->rx_pin == hw->tx_pin) {
+        ESP_LOGE(TAG, "%s: RX and TX cannot both be GPIO %d", HW_NS, hw->tx_pin);
+        hw->rx_pin = -1;
+        hw->tx_pin = -1;
+    }
+    hw->bus_valid = (hw->rx_pin >= 0 && hw->tx_pin >= 0);
+
+    /* If the user configured a different valid TX pin (or non-inverting mode),
+     * apply safe idle state immediately before Wi-Fi starts and release the
+     * unused default pin back to reset state. */
+    if (hw->tx_pin >= 0) {
+        if (hw->invert && hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO) {
+            st_phy_tx_hold_low(hw->tx_pin);
+            gpio_reset_pin((gpio_num_t)CONFIG_ST_BRIDGE_TX_GPIO);
+        } else if (!hw->invert) {
+            gpio_reset_pin((gpio_num_t)CONFIG_ST_BRIDGE_TX_GPIO);
+        }
+    }
+
+    hw->led_en_pin = (led_en >= 0) ? validate_gpio("led_en_pin", (int)led_en, true) : -1;
+    if (hw->led_en_pin >= 0 && (hw->led_en_pin == hw->tx_pin || hw->led_en_pin == hw->rx_pin)) {
+        ESP_LOGE(TAG, "%s.led_en_pin: GPIO %d conflicts with SeaTalk RX/TX", HW_NS, hw->led_en_pin);
+        hw->led_en_pin = -1;
+    }
+
+    return ESP_OK;
+}
+
+#if CONFIG_ST_BRIDGE_BENCH
 static const char *reset_reason_name(esp_reset_reason_t r)
 {
     switch (r) {
@@ -66,41 +160,64 @@ static uint32_t bump_boot_count(void)
     nvs_close(h);
     return boots;
 }
+#endif
 
 void app_main(void)
 {
-    /* Very first thing, before espOS: release the bus (TX high jams it). */
-    st_phy_tx_hold_low(CONFIG_ST_BRIDGE_TX_GPIO);
+    /* Very first thing, before espOS: release the bus on the default TX pin
+     * (TX HIGH jams the SeaTalk 1 bus). */
+    if (GPIO_IS_VALID_OUTPUT_GPIO(CONFIG_ST_BRIDGE_TX_GPIO) &&
+        !esp_gpio_is_reserved(BIT64(CONFIG_ST_BRIDGE_TX_GPIO))) {
+        st_phy_tx_hold_low(CONFIG_ST_BRIDGE_TX_GPIO);
+    }
 
+    hw_cfg_t hw = {
+        .rx_pin = -1,
+        .tx_pin = -1,
+        .invert = true,
+        .led_en_pin = -1,
+        .led_act_hi = true,
+        .bus_valid = false,
+    };
+
+    espos_start_opts_t opts = ESPOS_START_OPTS_DEFAULT;
+    opts.before_network = before_network_cb;
+    opts.arg = &hw;
+    ESP_ERROR_CHECK(espos_start(&opts));
+
+    st_leds_start(hw.led_en_pin, hw.led_act_hi);
+
+#if CONFIG_ST_BRIDGE_BENCH
     esp_reset_reason_t rr = esp_reset_reason();
-
-    ESP_ERROR_CHECK(espos_start(NULL));
-
-    /* RX/TX lights enable pin (if the board has one), from seatalk.leds. */
-    st_leds_start();
-
-    /* Console output mux right after espOS and before anything prints, so the
-     * output mutex exists for all tasks. The telnet server (if compiled in)
-     * starts on demand from the seatalk_console.telnet setting. */
     st_con_start();
-
-    /* nvs_flash_init() is done by espOS. */
     uint32_t boots = bump_boot_count();
-    st_con_printf("\nseatalk-bridge bench: reset reason %d (%s), boot #%u\n", (int)rr, reset_reason_name(rr),
-                  (unsigned)boots);
-
-    st_core_config_t cfg = ST_CORE_CONFIG_DEFAULT();
-    cfg.phy.uart_port = CONFIG_ST_BRIDGE_UART_PORT;
-    cfg.phy.rx_gpio = CONFIG_ST_BRIDGE_RX_GPIO;
-    cfg.phy.tx_gpio = CONFIG_ST_BRIDGE_TX_GPIO;
-#if CONFIG_ST_BRIDGE_INVERT
-    cfg.phy.invert = true;
-#else
-    cfg.phy.invert = false;
+    st_con_printf("\nseatalk-bridge bench: reset reason %d (%s), boot #%u\n", (int)rr,
+                  reset_reason_name(rr), (unsigned)boots);
 #endif
-    esp_err_t err = espos_seatalk_start(&cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "espos_seatalk_start failed: %s", esp_err_to_name(err));
+
+    bool bus_running = false;
+    if (!hw.bus_valid) {
+        ESP_LOGE(TAG, "SeaTalk bus stopped: fix %s.rx_pin / tx_pin in the web UI and restart", HW_NS);
+    } else {
+        st_core_config_t cfg = ST_CORE_CONFIG_DEFAULT();
+        cfg.phy.uart_port = CONFIG_ST_BRIDGE_UART_PORT;
+        cfg.phy.rx_gpio = hw.rx_pin;
+        cfg.phy.tx_gpio = hw.tx_pin;
+        cfg.phy.invert = hw.invert;
+
+        esp_err_t err = espos_seatalk_start(&cfg);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "espos_seatalk_start failed: %s", esp_err_to_name(err));
+        } else {
+            bus_running = true;
+            ESP_LOGI(TAG, "SeaTalk bus live on UART%d (RX=%d TX=%d invert=%s); status: GET /api/v1/seatalk",
+                     CONFIG_ST_BRIDGE_UART_PORT, hw.rx_pin, hw.tx_pin, hw.invert ? "on" : "off");
+        }
+    }
+
+    const esp_err_t api_err = st_api_register(bus_running, hw.tx_pin, hw.rx_pin, hw.invert);
+    if (api_err != ESP_OK) {
+        ESP_LOGW(TAG, "GET /api/v1/seatalk not registered: %s", esp_err_to_name(api_err));
     }
 
 #if CONFIG_ST_BRIDGE_BENCH

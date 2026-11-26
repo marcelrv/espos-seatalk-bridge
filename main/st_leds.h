@@ -2,10 +2,21 @@
  * SPDX-FileCopyrightText: 2026 Marcel Verpaalen
  * SPDX-License-Identifier: Apache-2.0
  *
- * RX/TX lights enable pin (CONFIG_ST_BRIDGE_LED_EN_GPIO), driven from the
- * espOS setting seatalk.leds. Does nothing on a board without that pin.
+ * RX/TX lights enable pin, driven from seatalk_hw.leds. Does nothing when no
+ * enable pin is configured (pin < 0).
  */
 #pragma once
 
-/* Drive the pin from the setting now and on every change. After espos_start. */
-void st_leds_start(void);
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Drive the validated enable pin from seatalk_hw.leds now and on every change.
+ * Pass pin < 0 when the board has no enable pin. Call after espos_start(). */
+void st_leds_start(int pin, bool active_high);
+
+#ifdef __cplusplus
+}
+#endif

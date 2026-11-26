@@ -45,7 +45,7 @@ st_tx_result_t st_phy_send(const uint8_t *bytes, uint8_t len, uint8_t *fail_idx)
     if (fail_idx) {
         *fail_idx = 0;
     }
-    return ST_TX_ERR_NOT_READY;
+    return ST_TX_NOT_READY;
 }
 
 uint32_t st_phy_quiet_us(void)
@@ -105,10 +105,9 @@ const char *st_tx_result_name(st_tx_result_t r)
 {
     switch (r) {
     case ST_TX_OK: return "ok";
-    case ST_TX_COLLISION: return "collision";
-    case ST_TX_NO_ECHO: return "no-echo";
-    case ST_TX_ERR_NOT_READY: return "not-ready";
-    case ST_TX_ERR_ARG: return "bad-arg";
-    default: return "unknown";
+    case ST_TX_COLLISION: return "COLLISION";
+    case ST_TX_NO_ECHO: return "NO-ECHO";
+    case ST_TX_NOT_READY: return "NOT-READY";
+    default: return "?";
     }
 }

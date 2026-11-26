@@ -11,51 +11,42 @@ menu "SeaTalk bridge"
             Hardware UART used for the bus. UART0 is the console.
 
     config ST_BRIDGE_RX_GPIO
-        int "SeaTalk RX GPIO"
+        int "Default SeaTalk RX GPIO"
         default 13 if IDF_TARGET_ESP32S3
         default 32
         help
-            Input from the bus interface. 32 on the SeaTalk ESP32 Remote board
-            (classic ESP32), 13 on the ESP32-S3 SuperMini wiring.
+            Default RX pin used when seatalk_hw.rx_pin is -1. 32 on the
+            SeaTalk ESP32 Remote board (classic ESP32), 13 on the ESP32-S3
+            SuperMini wiring. Overridable at runtime in the espOS web UI.
 
     config ST_BRIDGE_TX_GPIO
-        int "SeaTalk TX GPIO"
+        int "Default SeaTalk TX GPIO"
         default 12 if IDF_TARGET_ESP32S3
         default 33
         help
-            Output to the bus driver. HIGH pulls the bus low (jams it), so it
-            is driven LOW first thing in app_main. 33 on the SeaTalk ESP32
-            Remote board, 12 on the ESP32-S3 SuperMini wiring.
-
-    config ST_BRIDGE_INVERT
-        bool "Bus interface inverts RX and TX"
-        default y
-        help
-            Yes for a transistor/optocoupler interface that inverts both lines
-            (the SeaTalk ESP32 Remote board): an idle UART then drives TX LOW,
-            leaving the bus released.
+            Default TX pin used when seatalk_hw.tx_pin is -1. HIGH pulls the
+            bus low (jams it), so it is driven LOW first thing in app_main.
+            33 on the SeaTalk ESP32 Remote board, 12 on the ESP32-S3 SuperMini
+            wiring. Overridable at runtime in the espOS web UI.
 
     config ST_BRIDGE_LED_EN_GPIO
-        int "GPIO that enables the RX/TX lights (-1 = none)"
+        int "Default GPIO that enables the RX/TX lights (-1 = none)"
         range -1 48
         default 11 if IDF_TARGET_ESP32S3
         default -1
         help
-            Output that switches the bus activity lights on and off, driven
-            from the setting seatalk.leds (General, "RX/TX lights"). 11 on
-            the ESP32-S3 SuperMini wiring; -1 when the board has no such pin.
-
-    config ST_BRIDGE_LED_EN_ACTIVE_HIGH
-        bool "HIGH on that GPIO turns the lights on"
-        default y
+            Default output pin that switches the bus activity lights on and
+            off when seatalk_hw.led_en_pin is -1. 11 on the ESP32-S3 SuperMini
+            wiring; -1 when the board has no such pin. Overridable at runtime.
 
     config ST_BRIDGE_BENCH
         bool "Bench console on USB serial (key commands, statistics)"
-        default y
+        default n
         help
             Compile the bench console: single-key commands on the USB serial
             port (self-test, RX monitor, datagram table, statistics). Costs one
-            4 KB task. Without it the board runs only the bridge itself.
+            4 KB task. Off by default for release builds; enable in
+            sdkconfig.local for bench sessions.
 
     config ST_BRIDGE_TELNET
         bool "Telnet console (port 23, unauthenticated: bench use only)"

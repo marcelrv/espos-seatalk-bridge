@@ -1,0 +1,26 @@
+{
+  "namespace": "seatalk_hw",
+  "version": 1,
+  "title": "SeaTalk hardware",
+  "description": "Pins and polarity for the SeaTalk 1 bus interface. -1 uses this firmware's default for the chip (ESP32: RX 32, TX 33; ESP32-S3: RX 13, TX 12, LED enable 11). Pins used by flash or PSRAM are refused and leave the bus stopped with a log message.",
+  "keys": [
+    {"name": "rx_pin", "type": "int", "default": -1, "min": -1, "max": 48, "restart_required": true,
+     "title": "SeaTalk RX pin",
+     "description": "GPIO connected to the SeaTalk RX interface (-1 = chip default)."},
+    {"name": "tx_pin", "type": "int", "default": -1, "min": -1, "max": 48, "restart_required": true,
+     "title": "SeaTalk TX pin",
+     "description": "GPIO driving the SeaTalk TX interface (-1 = chip default). Avoid strapping, flash, and PSRAM pins."},
+    {"name": "invert", "type": "bool", "default": true, "restart_required": true,
+     "title": "Invert RX and TX",
+     "description": "On for transistor/optocoupler interfaces that invert both lines."},
+    {"name": "led_en_pin", "type": "int", "default": -1, "min": -2, "max": 48, "restart_required": true,
+     "title": "RX/TX lights enable pin",
+     "description": "GPIO enabling bus activity LEDs (-1 = chip default, -2 = disabled)."},
+    {"name": "led_act_hi", "type": "bool", "default": true, "restart_required": true,
+     "title": "Lights enable active high",
+     "description": "When on, driving the enable pin HIGH turns the RX/TX lights on."},
+    {"name": "leds", "type": "bool", "default": true,
+     "title": "RX/TX lights",
+     "description": "Bus activity lights on or off (applies immediately when an enable pin is configured)."}
+  ]
+}
