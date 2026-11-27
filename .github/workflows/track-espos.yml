@@ -90,23 +90,47 @@ jobs:
           TAG: ${{ steps.target.outputs.tag }}
         run: |
           set -euo pipefail
+          # espOS states its supported ESP-IDF in two places: .idf-version (the
+          # exact release) and ESPOS_IDF_MIN / ESPOS_IDF_MAX_EXCL (the range its
+          # CMake check and idf_component.yml constraints follow).
+          idf_range() {
+            sed -n "s/^set(ESPOS_IDF_$1 \"\([0-9.]*\)\")$/\1/p" espos/cmake/espos_version.cmake 2>/dev/null || true
+          }
           OLD_IDF=$(cat .idf-version)
+          OLD_MIN=$(idf_range MIN); OLD_MAX=$(idf_range MAX_EXCL)
           git -C espos checkout --quiet "$TAG"
           NEW_IDF=$(cat espos/.idf-version)
-          if [ "$OLD_IDF" != "$NEW_IDF" ]; then
-            printf '%s\n' "$NEW_IDF" > .idf-version
-            STALE=$(grep -nF -- "${OLD_IDF#v}" CMakeLists.txt README.md main/idf_component.yml tools/idf-env.ps1 || true)
-            {
-              echo "idf_moved=true"
-              echo "old_idf=$OLD_IDF"
-              echo "new_idf=$NEW_IDF"
-              echo "stale<<EOF"
-              echo "$STALE"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          else
+          NEW_MIN=$(idf_range MIN); NEW_MAX=$(idf_range MAX_EXCL)
+
+          if [ "$OLD_IDF" = "$NEW_IDF" ] && [ "$OLD_MIN" = "$NEW_MIN" ] && [ "$OLD_MAX" = "$NEW_MAX" ]; then
             echo "idf_moved=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          printf '%s\n' "$NEW_IDF" > .idf-version
+
+          # Everything in this repository (not the submodule, not the
+          # changelog) that may still name the old IDF: the exact release and
+          # the old range bounds anywhere (CMake, README, docs, scripts), and
+          # every idf_component.yml `idf:` constraint, which has to be
+          # reviewed against the new range by hand (a component may support
+          # more than espOS on purpose).
+          PATTERNS=(-e "${OLD_IDF#v}")
+          [ "$OLD_MIN" = "$NEW_MIN" ] || PATTERNS+=(-e "$OLD_MIN")
+          [ "$OLD_MAX" = "$NEW_MAX" ] || PATTERNS+=(-e "$OLD_MAX")
+          STALE=$(git grep -nF "${PATTERNS[@]}" -- . ':!espos' ':!CHANGELOG.md' ':!.idf-version' || true)
+          CONSTRAINTS=$(git grep -nE '^[[:space:]]*idf:' -- '*idf_component.yml' ':!espos' || true)
+          {
+            echo "idf_moved=true"
+            echo "old_idf=$OLD_IDF ([$OLD_MIN, $OLD_MAX))"
+            echo "new_idf=$NEW_IDF ([$NEW_MIN, $NEW_MAX))"
+            echo "new_range=>=$NEW_MIN,<$NEW_MAX"
+            echo "stale<<EOF"
+            echo "$STALE"
+            echo "EOF"
+            echo "constraints<<EOF"
+            echo "$CONSTRAINTS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Get optional GitHub App token for the PR
         id: app-token
@@ -130,6 +154,8 @@ jobs:
           OLD_IDF: ${{ steps.bump.outputs.old_idf }}
           NEW_IDF: ${{ steps.bump.outputs.new_idf }}
           STALE: ${{ steps.bump.outputs.stale }}
+          CONSTRAINTS: ${{ steps.bump.outputs.constraints }}
+          NEW_RANGE: ${{ steps.bump.outputs.new_range }}
         run: |
           set -euo pipefail
           BRANCH="track-espos-$TAG"
@@ -154,10 +180,16 @@ jobs:
             if [ "$IDF_MOVED" = true ]; then
               echo "### ESP-IDF moved: $OLD_IDF -> $NEW_IDF"
               echo
-              echo "\`.idf-version\` was bumped. Files still referencing the old version:"
+              echo "\`.idf-version\` was bumped. Files still naming the old release or range:"
               echo
               echo '```'
               echo "${STALE:-(none found)}"
+              echo '```'
+              echo
+              echo "\`idf:\` constraints in this repository; espOS now declares \`$NEW_RANGE\`:"
+              echo
+              echo '```'
+              echo "${CONSTRAINTS:-(none found)}"
               echo '```'
               echo
             fi
