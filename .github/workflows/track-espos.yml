@@ -3,8 +3,10 @@
 #
 # Follows signalk-espOS/espOS release tags and opens a PR bumping the espos/
 # submodule (and .idf-version when espOS moves IDF) in a signed-off (DCO)
-# commit. Merging that PR lets
-# release-please propose the next signed firmware release.
+# commit, together with the release-firmware.yml pin in release-please.yml.
+# Changing that pin needs a token with the workflows permission (a GitHub App
+# granted it); without one the PR asks for the pin by hand. Merging that PR
+# lets release-please propose the next signed firmware release.
 name: Track espOS releases
 
 concurrency:
@@ -101,6 +103,7 @@ jobs:
           git -C espos checkout --quiet "$TAG"
           NEW_IDF=$(cat espos/.idf-version)
           NEW_MIN=$(idf_range MIN); NEW_MAX=$(idf_range MAX_EXCL)
+          echo "sha=$(git -C espos rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
           if [ "$OLD_IDF" = "$NEW_IDF" ] && [ "$OLD_MIN" = "$NEW_MIN" ] && [ "$OLD_MAX" = "$NEW_MAX" ]; then
             echo "idf_moved=false" >> "$GITHUB_OUTPUT"
@@ -142,6 +145,10 @@ jobs:
           private-key: ${{ secrets.TRACK_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+          # To move the release-firmware.yml pin. An App not granted
+          # "Workflows: write" fails here and the run falls back to the
+          # workflow token, with the pin left to the PR.
+          permission-workflows: write
 
       - name: Open the tracking PR
         if: steps.target.outputs.skip == 'false'
@@ -156,26 +163,67 @@ jobs:
           STALE: ${{ steps.bump.outputs.stale }}
           CONSTRAINTS: ${{ steps.bump.outputs.constraints }}
           NEW_RANGE: ${{ steps.bump.outputs.new_range }}
+          SHA: ${{ steps.bump.outputs.sha }}
         run: |
           set -euo pipefail
           BRANCH="track-espos-$TAG"
           OLD_DESC=$(git -C espos describe --tags "$PINNED" 2>/dev/null || echo "${PINNED:0:7}")
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          RELEASE_WF=.github/workflows/release-please.yml
+
+          # The release build calls espOS's reusable release-firmware.yml at a
+          # pinned commit; move it with the submodule so a release is built by
+          # the espOS it was tested against.
+          sed -E -i \
+            -e "s|(signalk-espOS/espOS/\.github/workflows/release-firmware\.yml@)[0-9a-f]{40}( # ).*|\1$SHA\2$TAG|" \
+            -e "s|(Pinned to the immutable )v[0-9][^ ]*( commit SHA)|\1$TAG\2|" \
+            "$RELEASE_WF"
+          if git diff --quiet -- "$RELEASE_WF"; then
+            PIN=missing
+          else
+            PIN=moved
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
-          git add espos .idf-version
-          git commit --quiet --signoff -m "fix: bump espOS to $TAG" \
-            -m "Moves the espos submodule from $OLD_DESC to $TAG."
-          git push --quiet \
-            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "$BRANCH"
+          git add espos .idf-version "$RELEASE_WF"
+          MSG=(-m "fix: bump espOS to $TAG" -m "Moves the espos submodule from $OLD_DESC to $TAG.")
+          [ "$PIN" = moved ] && MSG+=(-m "Moves the release-firmware.yml pin in release-please.yml to the same commit.")
+          git commit --quiet --signoff "${MSG[@]}"
+          if ! git push --quiet "$REMOTE" "$BRANCH"; then
+            [ "$PIN" = moved ] || exit 1
+            # Changing a workflow file needs the workflows permission, which
+            # the workflow token never has and the App may not. Push the
+            # submodule bump alone and leave the pin to the reviewer.
+            echo "::warning::Could not push the release-please.yml change; leaving the pin for the PR."
+            git checkout --quiet HEAD~1 -- "$RELEASE_WF"
+            git commit --quiet --amend --signoff -m "fix: bump espOS to $TAG" \
+              -m "Moves the espos submodule from $OLD_DESC to $TAG."
+            git push --quiet "$REMOTE" "$BRANCH"
+            PIN=manual
+          fi
 
           BODY="$RUNNER_TEMP/body.md"
           {
             echo "Moves espOS from \`$OLD_DESC\` to [\`$TAG\`](https://github.com/signalk-espOS/espOS/releases/tag/$TAG)."
             echo
-            echo "Review the espOS release notes for breaking changes and consider updating the \`release-firmware.yml\` pin in \`.github/workflows/release-please.yml\`."
+            echo "Review the espOS release notes for breaking changes."
+            echo
+            case "$PIN" in
+              moved)
+                echo "The \`release-firmware.yml\` pin in \`$RELEASE_WF\` moved to the same commit (\`$SHA\`)."
+                ;;
+              manual)
+                echo "> [!IMPORTANT]"
+                echo "> The token could not change workflow files. Before merging, set the \`release-firmware.yml\` pin in \`$RELEASE_WF\` to:"
+                echo "> \`signalk-espOS/espOS/.github/workflows/release-firmware.yml@$SHA # $TAG\`"
+                ;;
+              *)
+                echo "> [!WARNING]"
+                echo "> No \`release-firmware.yml@<sha>\` pin found in \`$RELEASE_WF\`; check how the release build calls espOS."
+                ;;
+            esac
             echo
             if [ "$IDF_MOVED" = true ]; then
               echo "### ESP-IDF moved: $OLD_IDF -> $NEW_IDF"
