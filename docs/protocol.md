@@ -1,8 +1,8 @@
 # SeaTalk core: design spec
 
 The design for the firmware that connects a SeaTalk 1 bus to Signal K (and later, without Signal K, to NMEA 0183). It builds on:
-- the hardware brief [SeaTalkRemote_FIRMWARE.md](SeaTalkRemote_FIRMWARE.md);
-- the bench measurements made with the [st50-emulator](st50-emulator/) (test plan: [TESTPLAN.md](st50-emulator/TESTPLAN.md)).
+- the hardware brief, [hardware.md](hardware.md);
+- the bench measurements made with the st50-emulator, a separate bench board with its own test plan (TESTPLAN). Neither is part of this repository.
 
 Written 2026-11-13. Everything marked **measured** was measured on the bench: the SeaTalk ESP32 Remote board (variant A-6N137) with an ST50 Multi.
 

@@ -108,7 +108,7 @@ See [components/espos_seatalk/README.md](components/espos_seatalk/README.md).
 Requires ESP-IDF matching [`.idf-version`](.idf-version) (`v6.1.1`, matching
 espOS `v0.32.2`).
 
-### Linux / macOS
+### Linux
 
 ```sh
 git clone --recursive https://github.com/marcelrv/espos-seatalk-bridge.git
@@ -121,9 +121,30 @@ scripts/build.sh -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARG
 idf.py -B build-esp32s3 -p /dev/ttyACM0 flash monitor
 ```
 
+`scripts/build.sh` forwards to espOS's build wrapper, which serialises builds
+machine-wide and caps parallelism. It needs `flock`, `nproc` and `ionice`.
+
+### macOS
+
+macOS lacks those tools, so call `idf.py` directly with the same arguments:
+
+```sh
+git clone --recursive https://github.com/marcelrv/espos-seatalk-bridge.git
+cd espos-seatalk-bridge
+. $IDF_PATH/export.sh
+idf.py -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARGET=esp32s3 build
+idf.py -B build-esp32s3 -p /dev/cu.usbmodem* flash monitor
+```
+
 ### Windows (PowerShell)
 
+`tools\idf-env.ps1` loads ESP-IDF from `D:\Programming\esp` by default. Point
+it at your own install first: the ESP-IDF checkout and its tools folder
+(usually `%USERPROFILE%\.espressif`).
+
 ```powershell
+$env:ST_IDF_PATH = 'C:\esp\v6.1.1\esp-idf'
+$env:ST_IDF_TOOLS_PATH = "$env:USERPROFILE\.espressif"
 git submodule update --init
 . .\tools\idf-env.ps1
 idf.py -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARGET=esp32s3 build
