@@ -35,9 +35,9 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: write
-    # Pinned to a release tag (never @main) because this workflow receives
-    # SIGNING_KEY_PEM. Keep aligned when bumping espOS.
-    uses: signalk-espOS/espOS/.github/workflows/release-firmware.yml@v0.32.2
+    # Pinned to the immutable v0.32.2 commit SHA (never @main or a movable tag)
+    # because this workflow receives SIGNING_KEY_PEM. Keep aligned with espos/.
+    uses: signalk-espOS/espOS/.github/workflows/release-firmware.yml@f5c29a8c89b925383d2a8a8d07565209944e4f0a # v0.32.2
     with:
       name: seatalk-bridge
       builds: >-
