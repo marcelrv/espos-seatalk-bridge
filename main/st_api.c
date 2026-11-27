@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "espos_httpd.h"
+#include "espos_seatalk.h"
 #include "st_core.h"
 #include "st_sk.h"
 
@@ -33,8 +34,11 @@ static esp_err_t handle_get_seatalk(httpd_req_t *req)
     memset(&cs, 0, sizeof cs);
     memset(&ss, 0, sizeof ss);
 
+    const bool sk_running = ctx->running && espos_seatalk_sk_running();
     if (ctx->running) {
         st_core_get_stats(&cs);
+    }
+    if (sk_running) {
         st_sk_get_stats(&ss);
     }
 
@@ -44,13 +48,13 @@ static esp_err_t handle_get_seatalk(httpd_req_t *req)
     char buf[512];
     const int n = snprintf(
         buf, sizeof buf,
-        "{\"running\":%s,\"tx_pin\":%d,\"rx_pin\":%d,\"invert\":%s,"
+        "{\"running\":%s,\"sk_running\":%s,\"tx_pin\":%d,\"rx_pin\":%d,\"invert\":%s,"
         "\"bus_held_low\":%s,\"no_echo_pause\":%s,\"paused\":%s,"
         "\"rx_datagrams\":%" PRIu32 ",\"rx_bytes\":%" PRIu32 ",\"rx_errors\":%" PRIu32 ","
         "\"tx_ok\":%" PRIu32 ",\"tx_collisions\":%" PRIu32 ",\"tx_dropped\":%" PRIu32 ","
         "\"sk_published\":%" PRIu32 ",\"sk_received\":%" PRIu32 ","
         "\"sk_own_ignored\":%" PRIu32 ",\"sk_filtered\":%" PRIu32 "}",
-        ctx->running ? "true" : "false", ctx->tx_pin, ctx->rx_pin, ctx->invert ? "true" : "false",
+        ctx->running ? "true" : "false", sk_running ? "true" : "false", ctx->tx_pin, ctx->rx_pin, ctx->invert ? "true" : "false",
         cs.bus_held_low ? "true" : "false", cs.no_echo_pause ? "true" : "false",
         cs.paused ? "true" : "false", cs.link.datagrams, cs.phy.rx_bytes, rx_errors, cs.tx_ok,
         cs.tx_collisions, cs.tx_dropped, ss.published, ss.received, ss.own_ignored, ss.filtered);

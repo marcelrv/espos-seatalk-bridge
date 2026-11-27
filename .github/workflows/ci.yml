@@ -24,10 +24,14 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - run: |
+          # The hardware descriptor is a template; fill it as the esp32 build does.
+          sed -e 's/@ST_HW_TARGET@/esp32/; s/@ST_HW_RX@/32/g; s/@ST_HW_TX@/33/g' \
+              -e 's/@ST_HW_LED@/-1/g; s/@ST_HW_LED_TXT@/none/g' \
+              main/config/seatalk_hw.json.in > /tmp/seatalk_hw.json
           python3 espos/components/espos_config/tools/espos_gen_config.py \
             --schema-out /tmp/schema.json --c-out /tmp/gen.c --h-out /tmp/keys.h \
             components/espos_seatalk/config/seatalk.json \
-            main/config/seatalk_hw.json \
+            /tmp/seatalk_hw.json \
             main/config/seatalk_console.json
 
   host-tests:

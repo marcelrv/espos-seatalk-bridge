@@ -18,13 +18,15 @@ and configurable per-datagram direction and send rates in the device web UI.
 
 ### Default pins
 
-Any other free GPIO works: change pins under **SeaTalk hardware** (`seatalk_hw`)
-in the device's web UI and restart. Pins reserved by flash or PSRAM are refused
-and logged, leaving the web UI reachable for recovery.
+The settings under **SeaTalk hardware** (`seatalk_hw`) in the device's web UI
+start at these pins, and the page shows this build's defaults. Change them only
+if your board is wired differently, then restart: a wrong TX pin can hold the
+whole bus. Pins reserved by flash or PSRAM are refused and logged, leaving the
+web UI reachable for recovery.
 
 | Chip | Default RX | Default TX | Default LED enable | Notes |
 |---|---|---|---|---|
-| **ESP32** | GPIO 32 | GPIO 33 | disabled (`-1`) | Matches the SeaTalk ESP32 Remote board |
+| **ESP32** | GPIO 32 | GPIO 33 | none (`-1`) | Matches the SeaTalk ESP32 Remote board |
 | **ESP32-S3** | GPIO 13 | GPIO 12 | GPIO 11 (active HIGH) | Matches the ESP32-S3 SuperMini wiring; USB-C is USB Serial/JTAG |
 
 > **Bus safety:** On inverted optocoupler/transistor interfaces, driving TX HIGH

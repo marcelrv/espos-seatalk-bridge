@@ -31,8 +31,15 @@ extern "C" {
  * Start the SeaTalk 1 core task and, when compiled with espOS Signal K
  * support, the Signal K bridge adapter. Call after espos_start() (or directly
  * in standalone ESP-IDF projects without espOS).
+ *
+ * Returns the core's result only: ESP_OK means the bus is running. A Signal K
+ * adapter that fails to start is logged and shows in
+ * espos_seatalk_sk_running(); the bus keeps running without it.
  */
 esp_err_t espos_seatalk_start(const st_core_config_t *cfg);
+
+/** True once the Signal K adapter has started (always false without espOS). */
+bool espos_seatalk_sk_running(void);
 
 /**
  * True when this build includes the espOS Signal K adapter (espos_sk,

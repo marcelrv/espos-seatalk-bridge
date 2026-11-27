@@ -44,6 +44,21 @@ typedef struct {
     bool default_tx_held;
 } hw_cfg_t;
 
+/* Pins the system reserved before app_main touched any pin (flash, PSRAM).
+ * Taken as a snapshot because in ESP-IDF 6 gpio_config() of an output also
+ * reserves the pin: after the TX hold-low, esp_gpio_is_reserved() would
+ * report our own TX pin as taken. */
+static uint64_t s_boot_reserved;
+
+static void snapshot_reserved(void)
+{
+    for (int pin = 0; pin < 64; pin++) {
+        if (GPIO_IS_VALID_GPIO(pin) && esp_gpio_is_reserved(BIT64(pin))) {
+            s_boot_reserved |= BIT64(pin);
+        }
+    }
+}
+
 static int validate_gpio(const char *key, int pin, bool output)
 {
     if (pin < 0) {
@@ -55,11 +70,45 @@ static int validate_gpio(const char *key, int pin, bool output)
                  output ? "an output" : "an input");
         return -1;
     }
-    if (esp_gpio_is_reserved(BIT64(pin))) {
+    if (s_boot_reserved & BIT64(pin)) {
         ESP_LOGE(TAG, "%s.%s: GPIO %d is reserved by flash or PSRAM", HW_NS, key, pin);
         return -1;
     }
     return pin;
+}
+
+/* Drive the TX pin to the level that leaves the bus released: LOW for an
+ * inverting interface (HIGH would pull the bus low), HIGH otherwise. */
+static void tx_idle(int pin, bool invert)
+{
+    if (invert) {
+        st_phy_tx_hold_low(pin);
+        return;
+    }
+    const gpio_config_t io = {
+        .pin_bit_mask = 1ULL << (unsigned)pin,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_set_level((gpio_num_t)pin, 1); /* latch HIGH before enabling the driver */
+    (void)gpio_config(&io);
+    gpio_set_level((gpio_num_t)pin, 1);
+}
+
+/* Stop driving a pin that is no longer TX, leaving only the weak pull of the
+ * idle level (pull-down when inverted, pull-up otherwise). */
+static void tx_release(int pin, bool invert)
+{
+    const gpio_config_t io = {
+        .pin_bit_mask = 1ULL << (unsigned)pin,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = invert ? GPIO_PULLUP_DISABLE : GPIO_PULLUP_ENABLE,
+        .pull_down_en = invert ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    (void)gpio_config(&io);
 }
 
 static esp_err_t before_network_cb(void *arg)
@@ -77,11 +126,10 @@ static esp_err_t before_network_cb(void *arg)
     bool invert = true;
     (void)espos_config_get_bool(HW_NS, "invert", &invert);
 
-    int32_t led_en = -1;
-    if (espos_config_get_i32(HW_NS, "led_en_pin", &led_en) != ESP_OK || led_en == -1) {
+    /* The descriptor's default is this build's pin; -1 = no lights pin. */
+    int32_t led_en = CONFIG_ST_BRIDGE_LED_EN_GPIO;
+    if (espos_config_get_i32(HW_NS, "led_en_pin", &led_en) != ESP_OK) {
         led_en = CONFIG_ST_BRIDGE_LED_EN_GPIO;
-    } else if (led_en <= -2) {
-        led_en = -1; /* explicitly disabled */
     }
     bool led_act_hi = true;
     (void)espos_config_get_bool(HW_NS, "led_act_hi", &led_act_hi);
@@ -96,18 +144,23 @@ static esp_err_t before_network_cb(void *arg)
         ESP_LOGE(TAG, "%s: RX and TX cannot both be GPIO %d", HW_NS, hw->tx_pin);
     }
 
-    /* If the user configured a different valid TX pin (or non-inverting mode),
-     * apply safe idle state immediately before Wi-Fi starts and release the
-     * unused default pin only if startup actually acquired it. */
+    if (hw->rx_pin != CONFIG_ST_BRIDGE_RX_GPIO || hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO) {
+        ESP_LOGW(TAG, "%s: pins RX %d / TX %d differ from this build's RX %d / TX %d", HW_NS,
+                 hw->rx_pin, hw->tx_pin, CONFIG_ST_BRIDGE_RX_GPIO, CONFIG_ST_BRIDGE_TX_GPIO);
+    }
+
+    /* Put the configured TX pin in its idle (bus released) state before
+     * Wi-Fi starts. A default pin that app_main held LOW but that is no longer
+     * the TX pin (or no longer inverted) gets the weak pull of the idle level,
+     * never gpio_reset_pin()'s pull-up: if the setting is a typo and the real
+     * TX transistor is still on the default pin, a pull-up there would switch
+     * it on and hold the whole bus. */
     if (hw->tx_pin >= 0) {
-        if (hw->invert && hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO) {
-            st_phy_tx_hold_low(hw->tx_pin);
-            if (hw->default_tx_held) {
-                gpio_reset_pin((gpio_num_t)CONFIG_ST_BRIDGE_TX_GPIO);
-                hw->default_tx_held = false;
+        tx_idle(hw->tx_pin, hw->invert);
+        if (hw->default_tx_held && (hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO || !hw->invert)) {
+            if (hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO) {
+                tx_release(CONFIG_ST_BRIDGE_TX_GPIO, hw->invert);
             }
-        } else if (!hw->invert && hw->default_tx_held) {
-            gpio_reset_pin((gpio_num_t)CONFIG_ST_BRIDGE_TX_GPIO);
             hw->default_tx_held = false;
         }
     }
@@ -167,11 +220,12 @@ static uint32_t bump_boot_count(void)
 
 void app_main(void)
 {
+    snapshot_reserved();
     bool default_tx_held = false;
     /* Very first thing, before espOS: release the bus on the default TX pin
      * (TX HIGH jams the SeaTalk 1 bus). */
     if (GPIO_IS_VALID_OUTPUT_GPIO(CONFIG_ST_BRIDGE_TX_GPIO) &&
-        !esp_gpio_is_reserved(BIT64(CONFIG_ST_BRIDGE_TX_GPIO))) {
+        !(s_boot_reserved & BIT64(CONFIG_ST_BRIDGE_TX_GPIO))) {
         st_phy_tx_hold_low(CONFIG_ST_BRIDGE_TX_GPIO);
         default_tx_held = true;
     }
@@ -227,6 +281,12 @@ void app_main(void)
     }
 
 #if CONFIG_ST_BRIDGE_BENCH
-    st_bench_start();
+    /* The bench and simulator call into st_core, whose lock only exists once
+     * the bus has started. */
+    if (bus_running) {
+        st_bench_start();
+    } else {
+        st_con_printf("bench console off: SeaTalk bus not running (check %s pins)\n", HW_NS);
+    }
 #endif
 }

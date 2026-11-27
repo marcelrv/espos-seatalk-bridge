@@ -1,0 +1,26 @@
+{
+  "namespace": "seatalk_hw",
+  "version": 1,
+  "title": "SeaTalk hardware",
+  "description": "This @ST_HW_TARGET@ build uses RX GPIO @ST_HW_RX@, TX GPIO @ST_HW_TX@, lights enable @ST_HW_LED_TXT@. Change these only if your board is wired differently. Warning: a wrong TX pin leaves the real TX line undriven, which can hold the SeaTalk bus and blank every instrument on it. After a change, restart and check the log or GET /api/v1/seatalk. Invalid, flash and PSRAM pins are refused and stop the bus.",
+  "keys": [
+    {"name": "rx_pin", "type": "int", "default": @ST_HW_RX@, "min": 0, "max": 48, "restart_required": true,
+     "title": "SeaTalk RX pin",
+     "description": "GPIO reading the SeaTalk RX interface. Build default: GPIO @ST_HW_RX@."},
+    {"name": "tx_pin", "type": "int", "default": @ST_HW_TX@, "min": 0, "max": 48, "restart_required": true,
+     "title": "SeaTalk TX pin",
+     "description": "GPIO driving the SeaTalk TX interface. Build default: GPIO @ST_HW_TX@. A wrong pin can jam the whole bus; avoid strapping, USB, flash and PSRAM pins."},
+    {"name": "invert", "type": "bool", "default": true, "restart_required": true,
+     "title": "Invert RX and TX",
+     "description": "On for transistor/optocoupler interfaces that invert both lines (both supported boards)."},
+    {"name": "led_en_pin", "type": "int", "default": @ST_HW_LED@, "min": -1, "max": 48, "restart_required": true,
+     "title": "RX/TX lights enable pin",
+     "description": "GPIO that switches the bus activity lights; -1 = none. Build default: @ST_HW_LED_TXT@."},
+    {"name": "led_act_hi", "type": "bool", "default": true, "restart_required": true,
+     "title": "Lights enable active high",
+     "description": "When on, driving the enable pin HIGH turns the RX/TX lights on."},
+    {"name": "leds", "type": "bool", "default": true,
+     "title": "RX/TX lights",
+     "description": "Bus activity lights on or off; applies at once. Needs a lights enable pin."}
+  ]
+}
