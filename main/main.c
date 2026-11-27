@@ -191,6 +191,15 @@ static esp_err_t before_network_cb(void *arg)
         ESP_LOGE(TAG, "%s.led_en_pin: GPIO %d conflicts with SeaTalk RX/TX", HW_NS, hw->led_en_pin);
         hw->led_en_pin = -1;
     }
+    /* With TX moved (or refused), the build's default TX pin is left at its
+     * released level; the real TX transistor may still be wired there, so the
+     * lights must never drive it. */
+    if (hw->led_en_pin >= 0 && hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO &&
+        hw->led_en_pin == CONFIG_ST_BRIDGE_TX_GPIO) {
+        ESP_LOGE(TAG, "%s.led_en_pin: GPIO %d is this build's default SeaTalk TX pin", HW_NS,
+                 hw->led_en_pin);
+        hw->led_en_pin = -1;
+    }
 
     return ESP_OK;
 }
