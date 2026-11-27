@@ -21,8 +21,9 @@ and configurable per-datagram direction and send rates in the device web UI.
 The settings under **SeaTalk hardware** (`seatalk_hw`) in the device's web UI
 start at these pins, and the page shows this build's defaults. Change them only
 if your board is wired differently, then restart: a wrong TX pin can hold the
-whole bus. Pins reserved by flash or PSRAM are refused and logged, leaving the
-web UI reachable for recovery.
+whole bus. Pins reserved by flash or PSRAM, and strapping or USB pins other
+than this build's defaults, are refused and logged, leaving the web UI
+reachable for recovery.
 
 | Chip | Default RX | Default TX | Default LED enable | Notes |
 |---|---|---|---|---|

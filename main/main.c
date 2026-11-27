@@ -18,6 +18,7 @@
 #include "esp_log.h"
 #include "esp_private/esp_gpio_reserve.h"
 #include "esp_system.h"
+#include "soc/io_mux_reg.h"
 #include "espos.h"
 #include "espos_config.h"
 #include "espos_seatalk.h"
@@ -59,7 +60,30 @@ static void snapshot_reserved(void)
     }
 }
 
-static int validate_gpio(const char *key, int pin, bool output)
+/* Strapping pins, sampled at reset for boot mode, flash voltage (ESP32
+ * GPIO12) and boot log: a SeaTalk interface or a lights driver on one can
+ * stop the chip from booting. IDF has no capability macro for them, so the
+ * datasheet lists. */
+#if CONFIG_IDF_TARGET_ESP32
+#define ST_STRAPPING_PINS (BIT64(0) | BIT64(2) | BIT64(5) | BIT64(12) | BIT64(15))
+#elif CONFIG_IDF_TARGET_ESP32S3
+#define ST_STRAPPING_PINS (BIT64(0) | BIT64(3) | BIT64(45) | BIT64(46))
+#else
+#define ST_STRAPPING_PINS 0ULL
+#endif
+
+/* The internal USB PHY's D-/D+ (USB Serial/JTAG: console, flashing). */
+#if defined(USB_INT_PHY0_DM_GPIO_NUM) && defined(USB_INT_PHY0_DP_GPIO_NUM)
+#define ST_USB_PINS (BIT64(USB_INT_PHY0_DM_GPIO_NUM) | BIT64(USB_INT_PHY0_DP_GPIO_NUM))
+#else
+#define ST_USB_PINS 0ULL
+#endif
+
+/* A pin from the config is refused (-1) when the chip cannot use it, when
+ * flash or PSRAM hold it, or when it is a strapping or USB pin. The build's
+ * own default (build_default) skips the last check: the board it was built
+ * for is wired that way on purpose. */
+static int validate_gpio(const char *key, int pin, bool output, int build_default)
 {
     if (pin < 0) {
         return -1;
@@ -73,6 +97,17 @@ static int validate_gpio(const char *key, int pin, bool output)
     if (s_boot_reserved & BIT64(pin)) {
         ESP_LOGE(TAG, "%s.%s: GPIO %d is reserved by flash or PSRAM", HW_NS, key, pin);
         return -1;
+    }
+    if (pin != build_default) {
+        if (ST_STRAPPING_PINS & BIT64(pin)) {
+            ESP_LOGE(TAG, "%s.%s: GPIO %d is a strapping pin; wiring on it can stop the chip booting",
+                     HW_NS, key, pin);
+            return -1;
+        }
+        if (ST_USB_PINS & BIT64(pin)) {
+            ESP_LOGE(TAG, "%s.%s: GPIO %d is a USB data pin (USB Serial/JTAG)", HW_NS, key, pin);
+            return -1;
+        }
     }
     return pin;
 }
@@ -137,8 +172,8 @@ static esp_err_t before_network_cb(void *arg)
     bool led_act_hi = true;
     (void)espos_config_get_bool(HW_NS, "led_act_hi", &led_act_hi);
 
-    hw->rx_pin = validate_gpio("rx_pin", (int)rx, false);
-    hw->tx_pin = validate_gpio("tx_pin", (int)tx, true);
+    hw->rx_pin = validate_gpio("rx_pin", (int)rx, false, CONFIG_ST_BRIDGE_RX_GPIO);
+    hw->tx_pin = validate_gpio("tx_pin", (int)tx, true, CONFIG_ST_BRIDGE_TX_GPIO);
     hw->invert = invert;
     hw->led_act_hi = led_act_hi;
 
@@ -168,7 +203,7 @@ static esp_err_t before_network_cb(void *arg)
         }
     }
 
-    hw->led_en_pin = (led_en >= 0) ? validate_gpio("led_en_pin", (int)led_en, true) : -1;
+    hw->led_en_pin = (led_en >= 0) ? validate_gpio("led_en_pin", (int)led_en, true, CONFIG_ST_BRIDGE_LED_EN_GPIO) : -1;
     if (hw->led_en_pin >= 0 && (hw->led_en_pin == hw->tx_pin || hw->led_en_pin == hw->rx_pin)) {
         ESP_LOGE(TAG, "%s.led_en_pin: GPIO %d conflicts with SeaTalk RX/TX", HW_NS, hw->led_en_pin);
         hw->led_en_pin = -1;
