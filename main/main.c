@@ -97,15 +97,18 @@ static void tx_idle(int pin, bool invert)
     gpio_set_level((gpio_num_t)pin, 1);
 }
 
-/* Stop driving a pin that is no longer TX, leaving only the weak pull of the
- * idle level (pull-down when inverted, pull-up otherwise). */
-static void tx_release(int pin, bool invert)
+/* Stop driving the build's default TX pin when it is no longer TX, leaving
+ * only a weak pull-down. Always a pull-down, whatever the new invert setting:
+ * the default pin is wired as on this build's own board, whose TX interface
+ * inverts, so a pull-up there would switch its transistor on and hold the
+ * bus if the board is in fact still wired that way. */
+static void tx_release_default(int pin)
 {
     const gpio_config_t io = {
         .pin_bit_mask = 1ULL << (unsigned)pin,
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = invert ? GPIO_PULLUP_DISABLE : GPIO_PULLUP_ENABLE,
-        .pull_down_en = invert ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
     (void)gpio_config(&io);
@@ -151,15 +154,15 @@ static esp_err_t before_network_cb(void *arg)
 
     /* Put the configured TX pin in its idle (bus released) state before
      * Wi-Fi starts. A default pin that app_main held LOW but that is no longer
-     * the TX pin (or no longer inverted) gets the weak pull of the idle level,
-     * never gpio_reset_pin()'s pull-up: if the setting is a typo and the real
-     * TX transistor is still on the default pin, a pull-up there would switch
-     * it on and hold the whole bus. */
+     * the TX pin keeps a weak pull-down (see tx_release_default), never
+     * gpio_reset_pin()'s pull-up: if the setting is a typo and the real TX
+     * transistor is still on the default pin, a pull-up there would switch it
+     * on and hold the whole bus. */
     if (hw->tx_pin >= 0) {
         tx_idle(hw->tx_pin, hw->invert);
         if (hw->default_tx_held && (hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO || !hw->invert)) {
             if (hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO) {
-                tx_release(CONFIG_ST_BRIDGE_TX_GPIO, hw->invert);
+                tx_release_default(CONFIG_ST_BRIDGE_TX_GPIO);
             }
             hw->default_tx_held = false;
         }
