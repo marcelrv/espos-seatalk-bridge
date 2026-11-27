@@ -102,8 +102,8 @@ See [components/espos_seatalk/README.md](components/espos_seatalk/README.md).
 
 ## Build from source
 
-Requires ESP-IDF matching `espos/.idf-version` (currently `v6.0.3` on espOS
-`v0.29.1`, moving to `v6.1.1` with espOS `v0.32.2`).
+Requires ESP-IDF matching [`.idf-version`](.idf-version) (`v6.1.1`, matching
+espOS `v0.32.2`).
 
 ### Linux / macOS
 
@@ -113,8 +113,8 @@ cd espos-seatalk-bridge
 . $IDF_PATH/export.sh
 
 # Build esp32 or esp32s3 in separate build directories:
-idf.py -B build-esp32   -DSDKCONFIG=build-esp32/sdkconfig   -DIDF_TARGET=esp32   build
-idf.py -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARGET=esp32s3 build
+scripts/build.sh -B build-esp32   -DSDKCONFIG=build-esp32/sdkconfig   -DIDF_TARGET=esp32   build
+scripts/build.sh -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARGET=esp32s3 build
 idf.py -B build-esp32s3 -p /dev/ttyACM0 flash monitor
 ```
 
@@ -130,7 +130,23 @@ idf.py -B build-esp32s3 -p COMx flash monitor
 The first local configure generates a development signing key
 `secure_boot_signing_key.pem` (git-ignored). Devices only accept OTA images
 signed with the key they were flashed with; official GitHub releases are signed
-with a persistent CI key.
+with a persistent CI key (`SIGNING_KEY_PEM`).
+
+## Releases
+
+`release-please` watches `main`, opens a `chore: release <version>` PR, and on
+merge tags `vX.Y.Z` and runs espOS's reusable `release-firmware.yml` workflow
+to build, sign, attach (`-ota.bin`, `-merged.bin`, `-merged-{4,8,16}mb.bin`),
+and mirror images to the `release-assets` branch for the espOS Web Flasher and
+`signalk-espos-manager`.
+
+Repository setup required for automated releases:
+* **Settings → Actions → General**: enable *"Allow GitHub Actions to create and
+  approve pull requests"* with read/write workflow permissions.
+* **`SIGNING_KEY_PEM` secret**: persistent RSA-3072 signing key PEM (back up
+  offline; losing it prevents future OTA updates to deployed devices).
+* Optional: `DOCKERHUB_USERNAME` variable + `DOCKERHUB_TOKEN` secret to avoid
+  Docker Hub anonymous pull limits on GitHub runners.
 
 ### Bench console (opt-in)
 

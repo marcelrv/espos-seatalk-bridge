@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Marcel Verpaalen
 # SPDX-License-Identifier: Apache-2.0
 dependencies:
-  idf: ">=6.0.0,<6.2.0"
+  idf: ">=6.1.0,<6.2.0"
   signalk-espos/espos_core:
-    version: "^0.29.1"
+    version: "^0.32.2"
   signalk-espos/espos_sk:
-    version: "^0.29.1"
+    version: "^0.32.2"
   signalk-espos/espos_ota:
-    version: "^0.29.1"
+    version: "^0.32.2"
   espos_seatalk:
     git: "https://github.com/marcelrv/espos-seatalk-bridge.git"
     path: "components/espos_seatalk"
