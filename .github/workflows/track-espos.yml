@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Follows signalk-espOS/espOS release tags and opens a PR bumping the espos/
-# submodule (and .idf-version when espOS moves IDF). Merging that PR lets
+# submodule (and .idf-version when espOS moves IDF) in a signed-off (DCO)
+# commit. Merging that PR lets
 # release-please propose the next signed firmware release.
 name: Track espOS releases
 
@@ -138,7 +139,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add espos .idf-version
-          git commit --quiet -m "fix: bump espOS to $TAG" \
+          git commit --quiet --signoff -m "fix: bump espOS to $TAG" \
             -m "Moves the espos submodule from $OLD_DESC to $TAG."
           git push --quiet \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
