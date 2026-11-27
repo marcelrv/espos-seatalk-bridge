@@ -410,7 +410,10 @@ static void pub(int i, double v)
     (void)espos_sk_publish_number(path, v);
 }
 
-static void publish_diag(void)
+/* Called every DIAG_PERIOD_MS. The bus-load baseline is updated on every
+ * call so busLoad always covers the last period; send=false (stream down)
+ * skips only the publishing. */
+static void publish_diag(bool send)
 {
     static st_core_stats_t cs; /* only this task uses it */
     static uint64_t prev_bytes;
@@ -427,6 +430,9 @@ static void publish_diag(void)
     }
     prev_bytes = bytes;
     prev_us = now_us;
+    if (!send) {
+        return;
+    }
 
     pub(D_TX_OK, cs.tx_ok);
     pub(D_TX_COLL, cs.tx_collisions);
@@ -477,9 +483,7 @@ static void sk_task(void *arg)
              * which on an ESP32 without PSRAM starves Wi-Fi/TLS and ends in an
              * espos_health restart. Only the latest diag values matter. */
             espos_sk_ws_status_t ws;
-            if (espos_sk_ws_get_status(&ws) == ESP_OK && ws.connected) {
-                publish_diag();
-            }
+            publish_diag(espos_sk_ws_get_status(&ws) == ESP_OK && ws.connected);
             next_diag += diag_every;
             if (ticks_until(now, next_diag) < 0) {
                 next_diag = now + diag_every;
