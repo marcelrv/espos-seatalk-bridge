@@ -18,6 +18,12 @@ void st_phy_tx_hold_low(int tx_gpio)
     (void)tx_gpio;
 }
 
+void st_phy_tx_idle(int tx_gpio, bool invert)
+{
+    (void)tx_gpio;
+    (void)invert;
+}
+
 esp_err_t st_phy_init(const st_phy_config_t *cfg)
 {
     (void)cfg;

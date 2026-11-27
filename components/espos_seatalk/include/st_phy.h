@@ -63,14 +63,21 @@ typedef struct {
     bool expected_cmd;
 } st_phy_mismatch_t;
 
-/* Drive the TX pin as GPIO output LOW (bus released). Call first in app_main. */
+/* Drive the TX pin as GPIO output LOW (bus released through an inverting
+ * interface). Call first in app_main. Same as st_phy_tx_idle(tx_gpio, true). */
 void st_phy_tx_hold_low(int tx_gpio);
 
+/* Drive the TX pin as GPIO output at its idle level, which leaves the bus
+ * released: LOW when the interface inverts, HIGH when it does not. */
+void st_phy_tx_idle(int tx_gpio, bool invert);
+
 /* Configure the UART (4800 baud, 8 data + parity, inversion), connect RX and
- * install the IRAM ISR on the calling core. TX stays a GPIO held LOW. */
+ * install the IRAM ISR on the calling core. TX stays a GPIO at its idle level
+ * (st_phy_tx_idle with cfg->invert). */
 esp_err_t st_phy_init(const st_phy_config_t *cfg);
 
-/* Route TX to the UART (true) or back to GPIO LOW (false). Not while sending. */
+/* Route TX to the UART (true) or back to a GPIO at its idle level (false).
+ * Not while sending. */
 esp_err_t st_phy_tx_enable(bool enable);
 bool st_phy_tx_enabled(void);
 

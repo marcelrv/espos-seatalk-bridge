@@ -277,10 +277,13 @@ static void wait_timer_cb(void *arg)
     xSemaphoreGive(s_wait_sem);
 }
 
-void st_phy_tx_hold_low(int tx_gpio)
+void st_phy_tx_idle(int tx_gpio, bool invert)
 {
-    /* Output latch LOW before the driver is enabled: the pin never goes high. */
-    gpio_set_level((gpio_num_t)tx_gpio, 0);
+    /* Bus released: LOW through an inverting interface, HIGH otherwise.
+     * Output latch at that level before the driver is enabled: the pin never
+     * shows the other one. */
+    const uint32_t level = invert ? 0 : 1;
+    gpio_set_level((gpio_num_t)tx_gpio, level);
     const gpio_config_t io = {
         .pin_bit_mask = 1ULL << tx_gpio,
         .mode = GPIO_MODE_OUTPUT,
@@ -289,7 +292,12 @@ void st_phy_tx_hold_low(int tx_gpio)
         .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&io);
-    gpio_set_level((gpio_num_t)tx_gpio, 0);
+    gpio_set_level((gpio_num_t)tx_gpio, level);
+}
+
+void st_phy_tx_hold_low(int tx_gpio)
+{
+    st_phy_tx_idle(tx_gpio, true);
 }
 
 esp_err_t st_phy_init(const st_phy_config_t *cfg)
@@ -315,8 +323,8 @@ esp_err_t st_phy_init(const st_phy_config_t *cfg)
     (void)tx_sig;
     s_cfg = *cfg;
 
-    /* TX first: make sure it is a GPIO held LOW (bus released). */
-    st_phy_tx_hold_low(cfg->tx_gpio);
+    /* TX first: make sure it is a GPIO at its idle level (bus released). */
+    st_phy_tx_idle(cfg->tx_gpio, cfg->invert);
 
     s_tx_done = xSemaphoreCreateBinary();
     s_wait_sem = xSemaphoreCreateBinary();
@@ -376,9 +384,9 @@ esp_err_t st_phy_init(const st_phy_config_t *cfg)
         return err;
     }
     uart_ll_ena_intr_mask(s_hw, UART_INTR_RXFIFO_FULL | UART_INTR_RXFIFO_OVF);
-    ESP_LOGI(TAG, "UART%d RX GPIO%d TX GPIO%d (held LOW), %s, ISR on core %d", cfg->uart_port,
-             cfg->rx_gpio, cfg->tx_gpio, cfg->invert ? "inverted" : "not inverted",
-             esp_intr_get_cpu(s_intr));
+    ESP_LOGI(TAG, "UART%d RX GPIO%d TX GPIO%d (held %s), %s, ISR on core %d", cfg->uart_port,
+             cfg->rx_gpio, cfg->tx_gpio, cfg->invert ? "LOW" : "HIGH",
+             cfg->invert ? "inverted" : "not inverted", esp_intr_get_cpu(s_intr));
     return ESP_OK;
 }
 
@@ -395,14 +403,16 @@ esp_err_t st_phy_tx_enable(bool enable)
     }
     const int tx_sig = (s_cfg.uart_port == 1) ? U1TXD_OUT_IDX : U2TXD_OUT_IDX;
     if (enable) {
-        /* Inverted, idle UART TX -> output LOW -> bus released. */
+        /* Idle UART TX -> output at the idle level (LOW inverted, HIGH not)
+         * -> bus released. */
         while (!uart_ll_is_tx_idle(s_hw)) {
         }
         esp_rom_gpio_connect_out_signal(s_cfg.tx_gpio, tx_sig, false, false);
     } else {
-        gpio_set_level((gpio_num_t)s_cfg.tx_gpio, 0);
+        const uint32_t idle = s_cfg.invert ? 0 : 1;
+        gpio_set_level((gpio_num_t)s_cfg.tx_gpio, idle);
         esp_rom_gpio_connect_out_signal(s_cfg.tx_gpio, SIG_GPIO_OUT_IDX, false, false);
-        gpio_set_level((gpio_num_t)s_cfg.tx_gpio, 0);
+        gpio_set_level((gpio_num_t)s_cfg.tx_gpio, idle);
     }
     s_tx_routed = enable;
     return ESP_OK;
