@@ -16,7 +16,8 @@
  *    there, so it needs no lock.
  *  - the small "st_sk" task applies the config (the espos_config change
  *    callback only wakes it, debounced, because an import fires one callback
- *    per key) and publishes the diagnostics every 10 s. It is the only task
+ *    per key) and publishes the diagnostics every 10 s while the Signal K
+ *    stream is connected (never into the offline buffer). It is the only task
  *    that reads the config store.
  */
 #include "st_sk.h"
@@ -471,7 +472,14 @@ static void sk_task(void *arg)
         }
         now = xTaskGetTickCount();
         if (ticks_until(now, next_diag) <= 0) {
-            publish_diag();
+            /* Only while the stream is up: offline, every diag delta would sit
+             * in espos_sk's offline ring (~600 B per period) until it fills,
+             * which on an ESP32 without PSRAM starves Wi-Fi/TLS and ends in an
+             * espos_health restart. Only the latest diag values matter. */
+            espos_sk_ws_status_t ws;
+            if (espos_sk_ws_get_status(&ws) == ESP_OK && ws.connected) {
+                publish_diag();
+            }
             next_diag += diag_every;
             if (ticks_until(now, next_diag) < 0) {
                 next_diag = now + diag_every;
