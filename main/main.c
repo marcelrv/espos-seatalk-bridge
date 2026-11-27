@@ -112,26 +112,6 @@ static int validate_gpio(const char *key, int pin, bool output, int build_defaul
     return pin;
 }
 
-/* Drive the TX pin to the level that leaves the bus released: LOW for an
- * inverting interface (HIGH would pull the bus low), HIGH otherwise. */
-static void tx_idle(int pin, bool invert)
-{
-    if (invert) {
-        st_phy_tx_hold_low(pin);
-        return;
-    }
-    const gpio_config_t io = {
-        .pin_bit_mask = 1ULL << (unsigned)pin,
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    gpio_set_level((gpio_num_t)pin, 1); /* latch HIGH before enabling the driver */
-    (void)gpio_config(&io);
-    gpio_set_level((gpio_num_t)pin, 1);
-}
-
 /* Stop driving the build's default TX pin when it is no longer TX, leaving
  * only a weak pull-down. Always a pull-down, whatever the new invert setting:
  * the default pin is wired as on this build's own board, whose TX interface
@@ -139,6 +119,9 @@ static void tx_idle(int pin, bool invert)
  * bus if the board is in fact still wired that way. */
 static void tx_release_default(int pin)
 {
+    /* The early hold reserved the pin as an output; hand it back first, or
+     * gpio_config() logs "conflict found" for it. */
+    esp_gpio_revoke(BIT64(pin));
     const gpio_config_t io = {
         .pin_bit_mask = 1ULL << (unsigned)pin,
         .mode = GPIO_MODE_INPUT,
@@ -194,7 +177,7 @@ static esp_err_t before_network_cb(void *arg)
      * transistor is still on the default pin, a pull-up there would switch it
      * on and hold the whole bus. */
     if (hw->tx_pin >= 0) {
-        tx_idle(hw->tx_pin, hw->invert);
+        st_phy_tx_idle(hw->tx_pin, hw->invert);
         if (hw->default_tx_held && (hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO || !hw->invert)) {
             if (hw->tx_pin != CONFIG_ST_BRIDGE_TX_GPIO) {
                 tx_release_default(CONFIG_ST_BRIDGE_TX_GPIO);

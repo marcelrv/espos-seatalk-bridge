@@ -20,6 +20,7 @@
 #include "esp_check.h"
 #include "esp_intr_alloc.h"
 #include "esp_log.h"
+#include "esp_private/esp_gpio_reserve.h"
 #include "esp_rom_gpio.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -284,14 +285,22 @@ void st_phy_tx_idle(int tx_gpio, bool invert)
      * shows the other one. */
     const uint32_t level = invert ? 0 : 1;
     gpio_set_level((gpio_num_t)tx_gpio, level);
-    const gpio_config_t io = {
-        .pin_bit_mask = 1ULL << tx_gpio,
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&io);
+    if (esp_gpio_is_reserved(BIT64(tx_gpio))) {
+        /* Already set up as an output (IDF 6 gpio_config() reserves output
+         * pins), typically by the early hold in app_main: configuring it
+         * again only logs "conflict found". Just make sure it is a plain
+         * GPIO output again. */
+        gpio_set_direction((gpio_num_t)tx_gpio, GPIO_MODE_OUTPUT);
+    } else {
+        const gpio_config_t io = {
+            .pin_bit_mask = 1ULL << tx_gpio,
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE,
+        };
+        gpio_config(&io);
+    }
     gpio_set_level((gpio_num_t)tx_gpio, level);
 }
 
