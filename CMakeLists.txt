@@ -1,12 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Marcel Verpaalen
 # SPDX-License-Identifier: Apache-2.0
-# SeaTalk 1 <-> Signal K bridge (espOS, ESP-IDF 6.0).
-# Design: ../SeaTalkCore_SPEC.md   Hardware: ../SeaTalkRemote_FIRMWARE.md
+# SeaTalk 1 <-> Signal K bridge (espOS, ESP-IDF 6).
+# Design: docs/protocol.md   Hardware: docs/hardware.md
 #
 # espOS is the `espos/` git submodule. Its prologue sets the IDF version pin,
 # sdkconfig defaults, partition table, component dirs and the signing key.
-# The SeaTalk core (st_phy, st_link, st_sched, st_codec) lives in components/
-# and does not depend on espOS.
+# The reusable SeaTalk 1 stack lives in components/espos_seatalk/.
 cmake_minimum_required(VERSION 3.22)
 
 include("${CMAKE_CURRENT_LIST_DIR}/espos/cmake/espos_project.cmake")

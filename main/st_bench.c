@@ -24,6 +24,9 @@
 #include "driver/usb_serial_jtag_vfs.h"
 #endif
 #include "esp_err.h"
+#include "esp_heap_caps.h"
+#include "espos_ota.h"
+#include <stdlib.h>
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -189,8 +192,16 @@ static void print_stats(void)
     s_load_own = s.own_bytes;
     s_load_foreign = s.foreign_bytes;
 
-    st_con_printf("Heap free %u, min %u | con-drops %u\n", U(esp_get_free_heap_size()),
-                  U(esp_get_minimum_free_heap_size()), U(st_con_drops()));
+    st_con_printf("Heap free %u, min %u | int %u blk %u | con-drops %u\n", U(esp_get_free_heap_size()),
+                  U(esp_get_minimum_free_heap_size()), U(heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)),
+                  U(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)), U(st_con_drops()));
+    if (espos_ota_busy()) {
+        char *js = espos_ota_status_json();
+        const char *st = js ? strstr(js, "\"state\"") : NULL;
+        const char *rx = js ? strstr(js, "\"received\"") : NULL;
+        st_con_printf("OTA %.24s %.24s\n", st ? st : "-", rx ? rx : "-");
+        free(js);
+    }
 }
 
 static void reset_stats(void)

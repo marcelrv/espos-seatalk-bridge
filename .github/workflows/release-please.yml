@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+#
+# Cuts versioned releases from main via release-please, then calls espOS's
+# reusable release-firmware.yml to build, sign, attach, and mirror images
+# (to the release-assets branch) for the espOS Web Flasher and
+# signalk-espos-manager.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        id: rp
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  firmware:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: write
+    # Pinned to the immutable v0.32.2 commit SHA (never @main or a movable tag)
+    # because this workflow receives SIGNING_KEY_PEM. Keep aligned with espos/.
+    uses: signalk-espOS/espOS/.github/workflows/release-firmware.yml@f5c29a8c89b925383d2a8a8d07565209944e4f0a # v0.32.2
+    with:
+      name: seatalk-bridge
+      builds: >-
+        [{"target": "esp32", "flash_tables": "4mb 8mb 16mb"},
+         {"target": "esp32s3", "flash_tables": "4mb 8mb 16mb"}]
+      tag: ${{ needs.release-please.outputs.tag_name }}
+      require: storage
+    secrets:
+      signing_key: ${{ secrets.SIGNING_KEY_PEM }}
+      dockerhub_username: ${{ vars.DOCKERHUB_USERNAME }}
+      dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}

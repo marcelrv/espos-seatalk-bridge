@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+version: "0.1.0"
+description: "Raymarine SeaTalk 1 protocol stack and optional Signal K bridge component for espOS / ESP-IDF 6"
+url: "https://github.com/marcelrv/espos-seatalk-bridge/tree/main/components/espos_seatalk"
+repository: "https://github.com/marcelrv/espos-seatalk-bridge.git"
+issues: "https://github.com/marcelrv/espos-seatalk-bridge/issues"
+license: "Apache-2.0"
+maintainers:
+  - "Marcel Verpaalen"
+tags:
+  - signalk
+  - marine
+  - seatalk
+  - seatalk1
+  - raymarine
+  - esp-idf
+  - espos
+files:
+  exclude:
+    - "build/**/*"
+    - "build-*/**/*"
+    - "sdkconfig*"
+    - "managed_components/**/*"
+    - "dependencies.lock"
+    - "test/host/build/**/*"
+    - "examples/*/build/**/*"
+    - "examples/*/build-*/**/*"
+    - "examples/*/managed_components/**/*"
+    - "examples/*/dependencies.lock"
+    - "examples/*/sdkconfig"
+    - "examples/*/sdkconfig.old"
+    - "examples/*/*.pem"
+dependencies:
+  idf: ">=6.0.0,<6.2.0"
+  # espos_sk, espos_config, and espos_net are optional: when present in the
+  # build, the Signal K adapter and "seatalk" config descriptor are enabled;
+  # plain ESP-IDF projects can use the lower SeaTalk layers without espOS.

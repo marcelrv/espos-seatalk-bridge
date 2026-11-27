@@ -5,11 +5,11 @@
 # header themselves. Source files carry their own SPDX lines. The espos/
 # submodule is espOS's own and has its own REUSE.toml.
 version = 1
-SPDX-PackageName = "seatalk-bridge"
+SPDX-PackageName = "espos-seatalk-bridge"
 SPDX-PackageSupplier = "Marcel Verpaalen"
 
 [[annotations]]
-path = ["**/*.json", "**/*.md", "**/*.png", "**/*.jpg", "dependencies.lock", "version.txt"]
+path = ["**/*.json", "**/*.json.in", "**/*.md", "**/*.png", "**/*.jpg", "version.txt", ".idf-version"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Marcel Verpaalen"
 SPDX-License-Identifier = "Apache-2.0"

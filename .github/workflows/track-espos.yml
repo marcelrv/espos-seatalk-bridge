@@ -1,0 +1,321 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+#
+# Follows signalk-espOS/espOS release tags and opens a PR bumping the espos/
+# submodule (and .idf-version when espOS moves IDF) in a signed-off (DCO)
+# commit, together with the release-firmware.yml pin in release-please.yml.
+# Changing that pin needs a token with the workflows permission (a GitHub App
+# granted it); without one the PR asks for the pin by hand. Merging that PR
+# lets release-please propose the next signed firmware release.
+name: Track espOS releases
+
+concurrency:
+  group: track-espos
+  cancel-in-progress: false
+
+on:
+  schedule:
+    - cron: '35 5 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "espOS tag to move to (default: latest release)"
+        required: false
+
+permissions: {}
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      APP_CONFIGURED: >-
+        ${{ vars.TRACK_APP_CLIENT_ID != '' && secrets.TRACK_APP_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The PR targets main: never build it on whatever ref dispatched us.
+          ref: main
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine the espOS release to track
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG:-}"
+          EXPLICIT=yes
+          if [ -z "$TAG" ]; then
+            EXPLICIT=no
+            TAG=$(gh api repos/signalk-espOS/espOS/releases/latest --jq .tag_name)
+          fi
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$TAG' is not a vX.Y.Z tag"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "explicit=$EXPLICIT" >> "$GITHUB_OUTPUT"
+
+          git -C espos fetch --quiet --tags origin
+          PINNED=$(git rev-parse HEAD:espos)
+          TARGET=$(git -C espos rev-parse "$TAG^{commit}")
+          echo "pinned=$PINNED" >> "$GITHUB_OUTPUT"
+
+          skip() { echo "$1"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; }
+
+          if [ "$PINNED" = "$TARGET" ]; then
+            skip "Already pinned to $TAG ($TARGET)."
+          fi
+          PRS=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "track-espos-$TAG" \
+                  --state all --limit 1000 --json number,isCrossRepository \
+                  --jq 'map(select(.isCrossRepository == false)) | length')
+          if [ "$PRS" -gt 0 ]; then
+            skip "track-espos-$TAG already has a PR."
+          fi
+          if [ "$EXPLICIT" = no ] && ! git -C espos merge-base --is-ancestor "$PINNED" "$TARGET"; then
+            skip "$TAG does not contain the pinned espOS commit $PINNED; not moving automatically."
+          fi
+          if git ls-remote --exit-code --heads origin "track-espos-$TAG" >/dev/null; then
+            # Reclaim the name only from an earlier run of this workflow: there
+            # must be commits on it that main lacks, all of them the bot's. A
+            # branch someone pushed or created by hand is left alone.
+            BOT="41898282+github-actions[bot]@users.noreply.github.com"
+            git fetch --quiet origin "refs/heads/track-espos-$TAG"
+            TIP=$(git rev-parse FETCH_HEAD)
+            OWNERS=$(git log --format='%ae%n%ce' "origin/main..$TIP" | sort -u)
+            if [ "$OWNERS" != "$BOT" ]; then
+              echo "::error::Branch track-espos-$TAG exists without a PR and is not a branch left by this workflow; resolve it by hand."
+              exit 1
+            fi
+            echo "Removing stale branch track-espos-$TAG ($TIP) left by an earlier run."
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/track-espos-$TAG"
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Move the submodule
+        id: bump
+        if: steps.target.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # espOS states its supported ESP-IDF in two places: .idf-version (the
+          # exact release) and ESPOS_IDF_MIN / ESPOS_IDF_MAX_EXCL (the range its
+          # CMake check and idf_component.yml constraints follow).
+          idf_range() {
+            sed -n "s/^set(ESPOS_IDF_$1 \"\([0-9.]*\)\")$/\1/p" espos/cmake/espos_version.cmake 2>/dev/null || true
+          }
+          OLD_IDF=$(cat .idf-version)
+          OLD_MIN=$(idf_range MIN); OLD_MAX=$(idf_range MAX_EXCL)
+          git -C espos checkout --quiet "$TAG"
+          NEW_IDF=$(cat espos/.idf-version)
+          NEW_MIN=$(idf_range MIN); NEW_MAX=$(idf_range MAX_EXCL)
+          echo "sha=$(git -C espos rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+          if [ "$OLD_IDF" = "$NEW_IDF" ] && [ "$OLD_MIN" = "$NEW_MIN" ] && [ "$OLD_MAX" = "$NEW_MAX" ]; then
+            echo "idf_moved=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s\n' "$NEW_IDF" > .idf-version
+
+          # Everything in this repository (not the submodule, not the
+          # changelog) that may still name the old IDF: the exact release and
+          # the old range bounds anywhere (CMake, README, docs, scripts), and
+          # every idf_component.yml `idf:` constraint, which has to be
+          # reviewed against the new range by hand (a component may support
+          # more than espOS on purpose).
+          PATTERNS=(-e "${OLD_IDF#v}")
+          [ "$OLD_MIN" = "$NEW_MIN" ] || PATTERNS+=(-e "$OLD_MIN")
+          [ "$OLD_MAX" = "$NEW_MAX" ] || PATTERNS+=(-e "$OLD_MAX")
+          STALE=$(git grep -nF "${PATTERNS[@]}" -- . ':!espos' ':!CHANGELOG.md' ':!.idf-version' || true)
+          CONSTRAINTS=$(git grep -nE '^[[:space:]]*idf:' -- '*idf_component.yml' ':!espos' || true)
+          {
+            echo "idf_moved=true"
+            echo "old_idf=$OLD_IDF ([$OLD_MIN, $OLD_MAX))"
+            echo "new_idf=$NEW_IDF ([$NEW_MIN, $NEW_MAX))"
+            echo "new_range=>=$NEW_MIN,<$NEW_MAX"
+            echo "stale<<EOF"
+            echo "$STALE"
+            echo "EOF"
+            echo "constraints<<EOF"
+            echo "$CONSTRAINTS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Get optional GitHub App token for the PR
+        id: app-token
+        if: steps.target.outputs.skip == 'false' && env.APP_CONFIGURED == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.TRACK_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TRACK_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          # To move the release-firmware.yml pin. An App not granted
+          # "Workflows: write" fails here and the run falls back to the
+          # workflow token, with the pin left to the PR.
+          permission-workflows: write
+
+      - name: Open the tracking PR
+        if: steps.target.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          AS_APP: ${{ steps.app-token.outputs.token != '' }}
+          TAG: ${{ steps.target.outputs.tag }}
+          PINNED: ${{ steps.target.outputs.pinned }}
+          IDF_MOVED: ${{ steps.bump.outputs.idf_moved }}
+          OLD_IDF: ${{ steps.bump.outputs.old_idf }}
+          NEW_IDF: ${{ steps.bump.outputs.new_idf }}
+          STALE: ${{ steps.bump.outputs.stale }}
+          CONSTRAINTS: ${{ steps.bump.outputs.constraints }}
+          NEW_RANGE: ${{ steps.bump.outputs.new_range }}
+          SHA: ${{ steps.bump.outputs.sha }}
+        run: |
+          set -euo pipefail
+          BRANCH="track-espos-$TAG"
+          OLD_DESC=$(git -C espos describe --tags "$PINNED" 2>/dev/null || echo "${PINNED:0:7}")
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          RELEASE_WF=.github/workflows/release-please.yml
+
+          # The release build calls espOS's reusable release-firmware.yml at a
+          # pinned commit; move it with the submodule so a release is built by
+          # the espOS it was tested against.
+          sed -E -i \
+            -e "s|(signalk-espOS/espOS/\.github/workflows/release-firmware\.yml@)[0-9a-f]{40}( # ).*|\1$SHA\2$TAG|" \
+            -e "s|(Pinned to the immutable )v[0-9][^ ]*( commit SHA)|\1$TAG\2|" \
+            "$RELEASE_WF"
+          # Trust only the SHA actually on the uses: line, not a changed comment.
+          NOW=$(sed -nE 's|.*signalk-espOS/espOS/\.github/workflows/release-firmware\.yml@([0-9a-f]{40}).*|\1|p' "$RELEASE_WF" | sort -u)
+          if [ "$NOW" = "$SHA" ]; then
+            PIN=moved
+          else
+            git checkout --quiet -- "$RELEASE_WF"
+            PIN=missing
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add espos .idf-version "$RELEASE_WF"
+          MSG=(-m "fix: bump espOS to $TAG" -m "Moves the espos submodule from $OLD_DESC to $TAG.")
+          [ "$PIN" = moved ] && MSG+=(-m "Moves the release-firmware.yml pin in release-please.yml to the same commit.")
+          git commit --quiet --signoff "${MSG[@]}"
+          if ! git push --quiet "$REMOTE" "$BRANCH"; then
+            [ "$PIN" = moved ] || exit 1
+            # Changing a workflow file needs the workflows permission, which
+            # the workflow token never has and the App may not. Push the
+            # submodule bump alone and leave the pin to the reviewer.
+            echo "::warning::Could not push the release-please.yml change; leaving the pin for the PR."
+            git checkout --quiet HEAD~1 -- "$RELEASE_WF"
+            git commit --quiet --amend --signoff -m "fix: bump espOS to $TAG" \
+              -m "Moves the espos submodule from $OLD_DESC to $TAG."
+            git push --quiet "$REMOTE" "$BRANCH"
+            PIN=manual
+          fi
+
+          BODY="$RUNNER_TEMP/body.md"
+          {
+            echo "Moves espOS from \`$OLD_DESC\` to [\`$TAG\`](https://github.com/signalk-espOS/espOS/releases/tag/$TAG)."
+            echo
+            echo "Review the espOS release notes for breaking changes."
+            echo
+            case "$PIN" in
+              moved)
+                echo "The \`release-firmware.yml\` pin in \`$RELEASE_WF\` moved to the same commit (\`$SHA\`)."
+                ;;
+              manual)
+                echo "> [!IMPORTANT]"
+                echo "> The token could not change workflow files. Before merging, set the \`release-firmware.yml\` pin in \`$RELEASE_WF\` to:"
+                echo "> \`signalk-espOS/espOS/.github/workflows/release-firmware.yml@$SHA # $TAG\`"
+                ;;
+              *)
+                echo "> [!WARNING]"
+                echo "> No \`release-firmware.yml@<sha>\` pin found in \`$RELEASE_WF\`; check how the release build calls espOS."
+                ;;
+            esac
+            echo
+            if [ "$IDF_MOVED" = true ]; then
+              echo "### ESP-IDF moved: $OLD_IDF -> $NEW_IDF"
+              echo
+              echo "\`.idf-version\` was bumped. Files still naming the old release or range:"
+              echo
+              echo '```'
+              echo "${STALE:-(none found)}"
+              echo '```'
+              echo
+              echo "\`idf:\` constraints in this repository; espOS now declares \`$NEW_RANGE\`:"
+              echo
+              echo '```'
+              echo "${CONSTRAINTS:-(none found)}"
+              echo '```'
+              echo
+            fi
+            if [ "$AS_APP" != true ]; then
+              echo "Opened with the workflow token: close/reopen or approve workflows if checks do not start automatically."
+              echo
+            fi
+            echo "Opened by \`.github/workflows/track-espos.yml\` ([run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID))."
+          } > "$BODY"
+
+          gh pr create --head "$BRANCH" --base main \
+            --title "fix: bump espOS to $TAG" --body-file "$BODY"
+
+      - name: Close superseded tracking PRs
+        if: steps.target.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          TAG: ${{ steps.target.outputs.tag }}
+          EXPLICIT: ${{ steps.target.outputs.explicit }}
+        run: |
+          set -euo pipefail
+          if [ "$EXPLICIT" = yes ]; then
+            exit 0
+          fi
+          case "$TAG" in *-*) exit 0 ;; esac
+          NEW=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "track-espos-$TAG" \
+                  --state open --json number,isCrossRepository \
+                  --jq 'map(select(.isCrossRepository == false)) | .[0].number // empty')
+          [ -n "$NEW" ] || exit 0
+
+          # SemVer precedence for a stable $TAG: it supersedes any lower
+          # version and its own release candidates (sort -V alone would put
+          # v0.33.0-rc.1 after v0.33.0).
+          supersedes() {
+            local old_base="${1%%-*}" new_base="${2%%-*}"
+            if [ "$old_base" = "$new_base" ]; then
+              [ "$1" != "$old_base" ]
+            else
+              [ "$(printf '%s\n%s\n' "$old_base" "$new_base" | sort -V | tail -n1)" = "$new_base" ]
+            fi
+          }
+
+          BOT="41898282+github-actions[bot]@users.noreply.github.com"
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 1000 \
+              --json number,headRefName,isCrossRepository \
+              --jq '.[] | select(.isCrossRepository == false)
+                        | select(.headRefName | startswith("track-espos-v"))
+                        | "\(.number) \(.headRefName)"' |
+          while read -r NUM REF; do
+            OLD="${REF#track-espos-}"
+            [ "$OLD" = "$TAG" ] && continue
+            supersedes "$OLD" "$TAG" || continue
+            if ! gh pr close "$NUM" --repo "$GITHUB_REPOSITORY" \
+                   --comment "Superseded by #$NEW, which moves espOS to $TAG."; then
+              echo "::warning::Could not close #$NUM."
+              continue
+            fi
+            AUTHORS=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$NUM/commits" \
+                        --jq '.[] | .commit.author.email, .commit.committer.email' \
+                        | sort -u) || AUTHORS=unknown
+            if [ "$AUTHORS" = "$BOT" ]; then
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$REF" \
+                || echo "::warning::Could not delete $REF."
+            fi
+          done

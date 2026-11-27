@@ -1,171 +1,212 @@
-# seatalk-bridge
+# espos-seatalk-bridge
 
-SeaTalk 1 <-> Signal K bridge firmware for the SeaTalk ESP32 Remote board
-(classic ESP32) and the ESP32-S3 SuperMini. Built on [espOS](https://github.com/signalk-espOS/espOS)
-(ESP-IDF 6.0), included as the `espos/` submodule.
+A Raymarine SeaTalk 1 <-> Signal K bridge for ESP32 and ESP32-S3 boards, built on
+[espOS](https://github.com/signalk-espOS/espOS) (ESP-IDF 6).
 
-The design notes live next to this folder in the seatalk-remote project:
-`SeaTalkCore_SPEC.md` (design), `SeaTalkRemote_FIRMWARE.md` (hardware) and
-`st50-emulator/` (bench reference).
+It bridges SeaTalk 1 datagrams (depth, apparent wind, boat speed, log, water
+temperature, SOG, COG, compass heading, rudder angle, lamp level) to and from a
+Signal K server over Wi-Fi, with automatic loop prevention, magnetic fallback,
+and configurable per-datagram direction and send rates in the device web UI.
 
-## Status
+## What you need
 
-Tested on the bench with an ST50 Multi display and a signalk-server:
-- PHY self-test and soak runs on a real bus;
-- Signal K → SeaTalk: depth, wind, speed, SOG, COG and heading shown on the
-  ST50 and matching the server;
-- the SOG/COG substitutes;
-- memory stable over time.
+* **An ESP32 or ESP32-S3 board** (4 MB, 8 MB, or 16 MB flash). Classic ESP32
+  needs chip revision 3 or later (e.g., ESP32-WROOM-32E) for signed OTA updates.
+* **A SeaTalk 1 electrical interface** (transistor/optocoupler level shifter
+  between the 12 V single-wire SeaTalk DATA line and 3.3 V UART RX/TX). See
+  [docs/hardware.md](docs/hardware.md) for schematics and TX safety rules.
 
-Not yet proven on a boat over a longer period. SeaTalk → Signal K is
-implemented but untested, because the bench has no device that sends data
-(the ST50 only sends lamp datagrams). Treat it as experimental until it has
-sailed a while.
+### Default pins
 
-The SeaTalk layers (`components/st_*`) don't depend on the board firmware
-and only `st_sk` depends on espOS. Once proven on the boat, they may move into
-espOS as a regular component (like `espos_nmea0183`), with only the board
-firmware staying here.
+The settings under **SeaTalk hardware** (`seatalk_hw`) in the device's web UI
+start at these pins, and the page shows this build's defaults. Change them only
+if your board is wired differently, then restart: a wrong TX pin can hold the
+whole bus. Pins reserved by flash or PSRAM, and strapping or USB pins other
+than this build's defaults, are refused and logged, leaving the web UI
+reachable for recovery.
 
-## Build (Windows, PowerShell)
+| Chip | Default RX | Default TX | Default LED enable | Notes |
+|---|---|---|---|---|
+| **ESP32** | GPIO 32 | GPIO 33 | none (`-1`) | Matches the SeaTalk ESP32 Remote board |
+| **ESP32-S3** | GPIO 13 | GPIO 12 | GPIO 11 (active HIGH) | Matches the ESP32-S3 SuperMini wiring; USB-C is USB Serial/JTAG |
 
-Needs ESP-IDF v6.0.x (espOS's pin is in `espos/.idf-version`). Load it with
-your IDF's `export.ps1`, or with `tools/idf-env.ps1` after setting
-`$env:ST_IDF_PATH` (the IDF folder) and `$env:ST_IDF_TOOLS_PATH` (its tools
-folder). `-B <build-dir>` is optional; a build directory outside a synced
-source tree avoids sync conflicts.
+> **Bus safety:** On inverted optocoupler/transistor interfaces, driving TX HIGH
+> pulls SeaTalk DATA low and jams the bus. Ensure your TX driver has a hardware
+> pull-down resistor (e.g., 10 kΩ) so the bus stays released during reset and
+> bootloader execution.
 
-```powershell
-git submodule update --init
-. .\tools\idf-env.ps1
-idf.py -B <build-dir> set-target esp32   # once
-idf.py -B <build-dir> build
-idf.py -B <build-dir> -p COMx flash monitor
-```
+## Setup
 
-### ESP32-S3 SuperMini
-
-```powershell
-idf.py -B <s3-build-dir> -D SDKCONFIG=sdkconfig.s3 -D IDF_TARGET=esp32s3 build
-idf.py -B <s3-build-dir> menuconfig          # S3 settings: always with -B <s3-build-dir>
-idf.py -B <s3-build-dir> -p COMx flash monitor
-```
-
-A separate build directory and sdkconfig keep it apart from the ESP32 build.
-`sdkconfig.s3` lives in the project folder (git-ignored), so `fullclean` of
-the build directory keeps your menuconfig changes. Every later `idf.py` call
-for the S3 needs `-B <s3-build-dir>`: without it, idf.py uses the default
-build directory and the ESP32 configuration. After `fullclean`, or in a new
-build directory, `-B` alone is not enough: the build directory no longer
-remembers `sdkconfig.s3` or the target, and idf.py falls back to the ESP32
-and the project's `sdkconfig` (and rewrites it). Run the first command again,
-with both `-D` options, before `menuconfig` or `flash`.
-
-For this target the SeaTalk pins default to RX GPIO13 and TX GPIO12 and the
-console (bench keys included) is on the board's USB-C, the chip's own USB
-Serial/JTAG (`sdkconfig.defaults.esp32s3`). The pins, the UART and whether
-the bus interface inverts are in `idf.py -B <s3-build-dir> menuconfig` ->
-SeaTalk bridge. GPIO11 enables the RX/TX lights (HIGH = on); switch them in
-the web UI, SeaTalk bridge -> General -> "RX/TX lights" (`seatalk.leds`). The
-interface must hold the bus released while TX is LOW: the firmware drives TX
-LOW first thing at boot, but during reset and the bootloader the pin floats,
-so it needs a pull-down.
-
-The first configure generates a development signing key,
-`secure_boot_signing_key.pem` (git-ignored). A board flashed with it only
-accepts OTA images signed with the same key: back it up.
-
-## WiFi and OTA
-
-```powershell
-python tools/provision_wifi.py --port COMx --secrets <secrets.ini>   # WiFi into NVS (resets NVS)
-.\tools\ota.ps1 -Device <hostname>.local -Image <build-dir>\seatalk_bridge.bin   # serve the build from this PC and install it over WiFi
-```
-
-Pass `-Image` with the build directory of the board's chip (`<s3-build-dir>`
-for the S3): without it, `ota.ps1` serves a fixed default path. The device
-refuses an image built for the other chip.
-
-`secrets.ini` has a `[secrets]` section with `wifi_ssid` and `wifi_password`
-(default: the st50-emulator's, next to this folder). The device's hostname is
-`espos-` plus the last four hex digits of its MAC.
-
-The device pulls the image over HTTP from this PC (port 8070; allow Python
-through the Windows firewall on private networks). A new image that doesn't
-reach the network within 10 minutes rolls back to the previous one.
-
-On the CH340 DevKit the automatic reset into download mode is unreliable:
-hold BOOT, tap EN, release BOOT. Flash at 115200 baud; 460800 gave serial
-errors.
-
-## Bench console
-
-Key commands over USB serial and, optionally, WiFi (telnet). What is built in
-is chosen in `idf.py menuconfig` -> SeaTalk bridge:
-
-| Option | Default | What |
-|---|---|---|
-| `ST_BRIDGE_BENCH` | on | Bench console on USB serial (key commands, statistics) |
-| `ST_BRIDGE_TELNET` | off | Telnet console, port 23, unauthenticated: bench use only |
-| `ST_BRIDGE_SIM` | off | Simulated boat (demo values to the bus, keys `v`/`V`) |
-
-espOS has no run-time module loading, so optional parts are build-time
-choices. Telnet is the exception in one respect: when compiled in, it is
-switched on and off at run time in the espOS web UI (tab "SeaTalk1 console",
-namespace `seatalk_console`, setting `telnet`, default off). While off it costs no RAM (measured); while on it
-takes about 5 KB plus about 8 KB per open session. Without `ST_BRIDGE_SIM`, keys `v`/`V`
-only report that the simulator is not in this build.
-
-With telnet on, `stconsole.py` connects to `--host <hostname>.local`:
-
-```powershell
-python tools/stconsole.py --host <hostname>.local -k "t" -s 3   # statistics
-python tools/stconsole.py --host <hostname>.local -k "v" -s 2   # simulated boat on/off (needs ST_BRIDGE_SIM)
-python tools/stconsole.py --host <hostname>.local -k "d" -s 3   # per-datagram table (mode, rate, sent, stale, native)
-python tools/stconsole.py --host <hostname>.local -k "k" -s 8   # PHY self-test
-```
-
-`h` lists all keys. ST50 Multi notes (measured): heading is read from 89
-only; it has no COG page (53 is still sent for other devices); CMG/DMG
-are computed by the display, not sent by us; when data stops it keeps the
-last values for ~40 s before it shows dashes.
-
-## Signal K
-
-The device publishes and subscribes through espOS (approve it once in
-signalk-server under Security → Access Requests). Settings are in the espOS
-web UI, namespace `seatalk`: per datagram type a mode (`off`, `to_sk`,
-`to_bus`, `both`, `auto`) and transmit period, per value an optional
-Signal K `$source` filter, plus idle wait, jitter and stale timeout.
+1. **Flash the firmware.** Use **signalk-espos-manager** (**New board**) or the
+   [espOS web flasher](https://signalk-espos.github.io/signalk-espos-manager/flash/)
+   from your browser over USB; or download `<name>-<chip>-v<ver>-merged.bin`
+   from GitHub Releases and flash at offset `0x0` with `esptool`.
+2. **Join Wi-Fi.** On first boot the board opens `espOS-xxxx`. Join it, select
+   your boat's Wi-Fi at `http://192.168.4.1`, and reconnect on the boat network.
+3. **Approve in Signal K.** Open Signal K **Security → Access Requests** and
+   approve the device.
+4. **Configure.** Open `http://<device>.local/` to adjust:
+   * **SeaTalk hardware** (`seatalk_hw`): RX/TX pins, inversion, RX/TX lights
+     enable pin and live switch.
+   * **SeaTalk bridge** (`seatalk`): per-datagram mode (`off`, `to_sk`,
+     `to_bus`, `both`, `auto`), transmit periods, `$source` filters, idle wait,
+     and SOG/COG substitutes.
 
 ![espOS config page with the SeaTalk bridge settings](docs/config-page.jpg)
 
-- Values this device publishes appear as `$source` `<hostname>.XX`; the
-  adapter ignores those on the way back (no SeaTalk → Signal K → SeaTalk loop).
-- Without `headingMagnetic` / `courseOverGroundMagnetic` on the server, the
-  magnetic value is computed from the true one minus `magneticVariation`.
-- Diagnostics: `espos.<hostname>.seatalk.*` every 10 s.
-- Substitutes (group `Substitutes`): `stw_from_sog` sends SOG as boat speed
-  (datagram 20), `hdg_from_cog` sends COG as heading (89/9C), for displays
-  without SOG/COG pages such as the ST50 Multi. `fallback` uses them only
-  while the real value is stale, `replace` always.
+## Is it working?
 
-Memory (classic ESP32, no PSRAM): about 52 KB free at rest in the default
-build (bench console on, telnet and simulator off). `sdkconfig.defaults`
-trims espOS's Signal K batch table to 16 slots to help.
+Check `http://<device>.local/api/v1/seatalk` from any browser:
 
-## Host tests
-
-```powershell
-.\tools\host-test.ps1        # CMake + MSVC Build Tools 2022, runs ctest (build directory set in the script)
+```json
+{
+  "running": true,
+  "tx_pin": 12,
+  "rx_pin": 13,
+  "invert": true,
+  "bus_held_low": false,
+  "no_echo_pause": false,
+  "paused": false,
+  "rx_datagrams": 412,
+  "rx_bytes": 1840,
+  "rx_errors": 0,
+  "tx_ok": 95,
+  "tx_collisions": 0,
+  "tx_dropped": 0,
+  "sk_published": 120,
+  "sk_received": 95,
+  "sk_own_ignored": 0,
+  "sk_filtered": 0
+}
 ```
 
-## Back to the emulator
+Diagnostics are also published to Signal K under `espos.<hostname>.seatalk.*`
+every 10 s.
 
-Flash `st50-emulator/firmware/st50-emulator-merged.bin` (next to this
-folder) at 0x0, or run `pio run -t upload` in `st50-emulator/`.
+## Status
+
+Tested on the bench with a Raymarine ST50 Multi display and `signalk-server`:
+- PHY self-test and soak runs on a real bus;
+- Signal K → SeaTalk: depth, wind, speed, SOG, COG, and heading verified on the
+  ST50;
+- SOG/COG substitutes (`stw_from_sog`, `hdg_from_cog`);
+- Stable heap over time.
+
+SeaTalk → Signal K is implemented and unit-tested, and awaiting extended on-boat
+testing with transmitting SeaTalk instruments.
+
+## Reusable component (`components/espos_seatalk`)
+
+The entire SeaTalk 1 stack (`st_phy`, `st_link`, `st_codec`, `st_sched`,
+`st_core`, and optional `st_sk`) is packaged as a single ESP-IDF component in
+[components/espos_seatalk/](components/espos_seatalk/) with its own
+`idf_component.yml`, host unit tests, and standalone `from_registry` example.
+See [components/espos_seatalk/README.md](components/espos_seatalk/README.md).
+
+## Build from source
+
+Requires ESP-IDF matching [`.idf-version`](.idf-version) (`v6.1.1`, matching
+espOS `v0.32.2`).
+
+### Linux
+
+```sh
+git clone --recursive https://github.com/marcelrv/espos-seatalk-bridge.git
+cd espos-seatalk-bridge
+. $IDF_PATH/export.sh
+
+# Build esp32 or esp32s3 in separate build directories:
+scripts/build.sh -B build-esp32   -DSDKCONFIG=build-esp32/sdkconfig   -DIDF_TARGET=esp32   build
+scripts/build.sh -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARGET=esp32s3 build
+idf.py -B build-esp32s3 -p /dev/ttyACM0 flash monitor
+```
+
+`scripts/build.sh` forwards to espOS's build wrapper, which serialises builds
+machine-wide and caps parallelism. It needs `flock`, `nproc` and `ionice`.
+
+### macOS
+
+macOS lacks those tools, so call `idf.py` directly with the same arguments:
+
+```sh
+git clone --recursive https://github.com/marcelrv/espos-seatalk-bridge.git
+cd espos-seatalk-bridge
+. $IDF_PATH/export.sh
+idf.py -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARGET=esp32s3 build
+idf.py -B build-esp32s3 -p /dev/cu.usbmodem* flash monitor
+```
+
+### Windows (PowerShell)
+
+`tools\idf-env.ps1` loads ESP-IDF from `D:\Programming\esp` by default. Point
+it at your own install first: the ESP-IDF checkout and its tools folder
+(usually `%USERPROFILE%\.espressif`).
+
+```powershell
+$env:ST_IDF_PATH = 'C:\esp\v6.1.1\esp-idf'
+$env:ST_IDF_TOOLS_PATH = "$env:USERPROFILE\.espressif"
+git submodule update --init
+. .\tools\idf-env.ps1
+idf.py -B build-esp32s3 -DSDKCONFIG=build-esp32s3/sdkconfig -DIDF_TARGET=esp32s3 build
+idf.py -B build-esp32s3 -p COMx flash monitor
+```
+
+The first local configure generates a development signing key
+`secure_boot_signing_key.pem` (git-ignored). Devices only accept OTA images
+signed with the key they were flashed with; official GitHub releases are signed
+with a persistent CI key (`SIGNING_KEY_PEM`).
+
+## Releases
+
+`release-please` watches `main`, opens a `chore: release <version>` PR, and on
+merge tags `vX.Y.Z` and runs espOS's reusable `release-firmware.yml` workflow
+to build, sign, attach (`-ota.bin`, `-merged.bin`, `-merged-{4,8,16}mb.bin`),
+and mirror images to the `release-assets` branch for the espOS Web Flasher and
+`signalk-espos-manager`.
+
+Repository setup required for automated releases:
+* **Settings → Actions → General**: enable *"Allow GitHub Actions to create and
+  approve pull requests"* with read/write workflow permissions.
+* **`SIGNING_KEY_PEM` secret**: persistent RSA-3072 signing key PEM (back up
+  offline; losing it prevents future OTA updates to deployed devices).
+* Optional: `DOCKERHUB_USERNAME` variable + `DOCKERHUB_TOKEN` secret to avoid
+  Docker Hub anonymous pull limits on GitHub runners.
+
+### Bench console (opt-in)
+
+The USB serial bench console (`CONFIG_ST_BRIDGE_BENCH`), unauthenticated LAN
+telnet mirror (`CONFIG_ST_BRIDGE_TELNET`), and simulated boat
+(`CONFIG_ST_BRIDGE_SIM`) are **off by default** in release builds. To enable
+them locally without modifying tracked files, create a git-ignored
+`sdkconfig.local` in the project root:
+
+```ini
+CONFIG_ST_BRIDGE_BENCH=y
+# CONFIG_ST_BRIDGE_TELNET=y
+# CONFIG_ST_BRIDGE_SIM=y
+```
+
+Delete `build-<target>/sdkconfig` after changing `sdkconfig.local` so IDF
+re-applies defaults.
+
+## Host unit tests
+
+```powershell
+# Windows (MSVC + Ninja)
+powershell -File tools\host-test.ps1 -Clean
+```
+
+```sh
+# Linux / macOS
+cmake -S components/espos_seatalk/test/host -B build-host && cmake --build build-host && ctest --test-dir build-host --output-on-failure
+```
+
+## Documentation
+
+- [docs/hardware.md](docs/hardware.md) — SeaTalk interface schematics, signal polarity, TX safety rules
+- [docs/protocol.md](docs/protocol.md) — SeaTalk 1 PHY/link/codec/scheduler/Signal K specification
 
 ## License
 
 Apache-2.0 ([LICENSE](LICENSE)), the same as espOS. Every source file carries
-SPDX headers; [REUSE.toml](REUSE.toml) covers the files that cannot.
+SPDX headers; [REUSE.toml](REUSE.toml) covers files that cannot.

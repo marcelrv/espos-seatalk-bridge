@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Marcel Verpaalen
+# SPDX-License-Identifier: Apache-2.0
+
+menu "SeaTalk 1 (espos_seatalk)"
+    comment "Hardware pins and inversion are passed by the application in st_core_config_t."
+endmenu
