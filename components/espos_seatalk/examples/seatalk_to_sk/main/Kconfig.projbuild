@@ -16,8 +16,9 @@ menu "SeaTalk example wiring"
         default 12 if IDF_TARGET_ESP32S3
         default 33
         help
-            GPIO connected to the SeaTalk TX driver. Must be held LOW at boot
-            so the SeaTalk bus stays released.
+            GPIO connected to the SeaTalk TX driver. It is set to its idle
+            level at boot (LOW when inverting, HIGH otherwise) so the SeaTalk
+            bus stays released.
 
     config EXAMPLE_SEATALK_INVERT
         bool "Bus interface inverts RX and TX"

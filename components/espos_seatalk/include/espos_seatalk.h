@@ -6,8 +6,9 @@
  * optional espOS Signal K adapter.
  *
  * Usage:
- *   1. Before espos_start(): call st_phy_tx_hold_low(tx_gpio) so the bus stays
- *      released during startup (TX HIGH jams the SeaTalk 1 bus).
+ *   1. Before espos_start(): call st_phy_tx_idle(tx_gpio, cfg.phy.invert) so
+ *      the bus stays released during startup (LOW for an inverting interface,
+ *      HIGH for a non-inverting one).
  *   2. Start espOS: espos_start(&opts).
  *   3. Start SeaTalk: espos_seatalk_start(&cfg).
  *

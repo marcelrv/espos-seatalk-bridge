@@ -32,7 +32,7 @@ GPIO26–37):
 
 void app_main(void)
 {
-    st_phy_tx_hold_low(SEATALK_TX_GPIO); /* release bus immediately on boot */
+    st_phy_tx_idle(SEATALK_TX_GPIO, true); /* release bus at boot (inverting interface) */
     ESP_ERROR_CHECK(espos_start(NULL));
 
     st_core_config_t cfg = ST_CORE_CONFIG_DEFAULT();

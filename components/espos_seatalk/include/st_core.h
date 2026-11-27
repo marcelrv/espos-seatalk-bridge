@@ -53,7 +53,7 @@ typedef struct {
     }
 
 /* Start st_task: init the PHY on task_core, route TX, run. Call once, after
- * st_phy_tx_hold_low() at the top of app_main. */
+ * st_phy_tx_idle() at the top of app_main. */
 esp_err_t st_core_start(const st_core_config_t *cfg);
 
 /* RX callback, called from st_task for every link event:

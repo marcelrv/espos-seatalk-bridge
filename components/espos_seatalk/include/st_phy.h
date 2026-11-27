@@ -14,8 +14,8 @@
  *       bit. Bytes go out one at a time from the TX-done interrupt, and every
  *       byte's echo is checked before the next one is written.
  *
- * Bus safety (spec 3.2): call st_phy_tx_hold_low() as the very first thing in
- * app_main. st_phy_init() sets the UART inversion before TX is ever routed;
+ * Bus safety (spec 3.2): call st_phy_tx_idle() (st_phy_tx_hold_low() for an
+ * inverting interface) as the very first thing in app_main. st_phy_init() sets the UART inversion before TX is ever routed;
  * st_phy_tx_enable(true) routes it. An inverted, idle UART TX drives LOW,
  * which leaves the bus released, also after a panic or a debugger halt (at
  * most the one byte in the FIFO still goes out).
