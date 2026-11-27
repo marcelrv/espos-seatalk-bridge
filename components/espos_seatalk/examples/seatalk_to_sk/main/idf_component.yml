@@ -8,7 +8,9 @@ dependencies:
     version: "^0.32.2"
   signalk-espos/espos_ota:
     version: "^0.32.2"
+  # The component this example ships with, taken from the tree it sits in
+  # (components/espos_seatalk). No git source: the component manager would
+  # fetch it even with override_path set, so CI would build the remote copy,
+  # not the change under test.
   espos_seatalk:
-    git: "https://github.com/marcelrv/espos-seatalk-bridge.git"
-    path: "components/espos_seatalk"
     override_path: "../../.."

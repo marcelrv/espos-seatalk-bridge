@@ -78,3 +78,32 @@ jobs:
 
       - name: Check the espOS web UI made it into the image
         run: test -s build/storage.bin
+
+  # The component's standalone example: espOS from the ESP Component Registry
+  # and espos_seatalk from this tree (override_path), no prologue. It is what
+  # a project consuming the component looks like, so a change that breaks it
+  # must fail here and not only for users.
+  example:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [esp32, esp32s3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Read pinned IDF version
+        id: idf
+        run: echo "version=$(cat .idf-version)" >> "$GITHUB_OUTPUT"
+
+      # espOS's build_example.sh makes a throwaway signing key (the example has
+      # no prologue to generate one) before set-target, then builds. Paths are
+      # relative to the espos/ checkout it runs from.
+      - uses: espressif/esp-idf-ci-action@9d38657f3d789ca759b2b37aaf5ceffbc42c4f0d # v1
+        with:
+          esp_idf_version: ${{ steps.idf.outputs.version }}
+          target: ${{ matrix.target }}
+          command: espos/scripts/build_example.sh ../components/espos_seatalk/examples/seatalk_to_sk ${{ matrix.target }}
